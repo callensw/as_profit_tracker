@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aesthetic State | Business Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-primary: #F5F4F0;
+            --bg-secondary: #FFFFFF;
+            --bg-accent: #E8E6E1;
+            --bg-dark: #1C1C1C;
+            --text-primary: #1C1C1C;
+            --text-secondary: #4A4A4A;
+            --text-muted: #7A7A7A;
+            --accent-olive: #5C6B54;
+            --accent-olive-light: #E8EBE6;
+            --income-sage: #6B7B64;
+            --income-sage-light: #E8EDE6;
+            --expense-clay: #9C7B6B;
+            --expense-clay-light: #F2EBE7;
+            --border: #D9D6CF;
+            --shadow: rgba(28, 28, 28, 0.08);
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'DM Sans', sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; line-height: 1.6; font-weight: 400; }
+        
+        .auth-container { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; background: linear-gradient(135deg, #F5F4F0 0%, #E8E6E1 100%); }
+        .auth-card { background: var(--bg-secondary); border-radius: var(--radius-lg); border: 1px solid var(--border); width: 100%; max-width: 380px; padding: 2.5rem; box-shadow: 0 24px 48px var(--shadow); }
+        .auth-logo { text-align: center; margin-bottom: 2.5rem; }
+        .auth-logo-text { font-family: 'DM Serif Display', serif; font-size: 1.75rem; font-weight: 400; letter-spacing: 0.02em; color: var(--text-primary); }
+        .auth-logo-sub { font-size: 0.65rem; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.25em; margin-top: 0.5rem; }
+        .auth-tabs { display: flex; gap: 2rem; margin-bottom: 2rem; justify-content: center; }
+        .auth-tab { font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 500; padding: 0.5rem 0; border: none; background: transparent; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s ease; letter-spacing: 0.05em; text-transform: uppercase; }
+        .auth-tab:hover { color: var(--text-secondary); }
+        .auth-tab.active { color: var(--text-primary); border-bottom-color: var(--bg-dark); }
+        .auth-error { background: var(--expense-clay-light); color: var(--expense-clay); padding: 0.75rem 1rem; border-radius: var(--radius-sm); font-size: 0.8rem; margin-bottom: 1rem; display: none; }
+        .auth-error.show { display: block; }
+        .auth-success { background: var(--income-sage-light); color: var(--income-sage); padding: 0.75rem 1rem; border-radius: var(--radius-sm); font-size: 0.8rem; margin-bottom: 1rem; display: none; }
+        .auth-success.show { display: block; }
+
+        .header { background: var(--bg-dark); border-bottom: none; padding: 1rem 1.5rem; position: sticky; top: 0; z-index: 100; }
+        .header-content { max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+        .logo { display: flex; align-items: center; gap: 0.75rem; }
+        .logo-text { font-family: 'DM Serif Display', serif; font-size: 1.25rem; font-weight: 400; letter-spacing: 0.02em; color: #FFFFFF; }
+        .logo-sub { font-size: 0.55rem; font-weight: 500; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.2em; }
+        .header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+        .user-email { font-size: 0.7rem; color: rgba(255,255,255,0.5); margin-right: 0.5rem; }
+
+        .btn { font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 500; padding: 0.6rem 1.1rem; border-radius: var(--radius-sm); border: none; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 0.4rem; letter-spacing: 0.03em; }
+        .btn-primary { background: var(--bg-dark); color: #FFFFFF; }
+        .btn-primary:hover { background: #333; }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-secondary { background: var(--bg-accent); color: var(--text-primary); }
+        .btn-secondary:hover { background: var(--border); }
+        .btn-ghost { background: transparent; color: rgba(255,255,255,0.7); }
+        .btn-ghost:hover { background: rgba(255,255,255,0.1); color: #FFFFFF; }
+
+        .main { max-width: 1400px; margin: 0 auto; padding: 2rem 1.5rem; }
+        .app-container { display: none; }
+        .app-container.show { display: block; }
+
+        /* Tabs Navigation */
+        .tabs { display: flex; gap: 0; margin-bottom: 2rem; border-bottom: 1px solid var(--border); }
+        .tab { font-size: 0.75rem; font-weight: 500; padding: 1rem 1.5rem; border-radius: 0; border: none; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.2s ease; text-transform: uppercase; letter-spacing: 0.1em; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+        .tab:hover { color: var(--text-primary); }
+        .tab.active { color: var(--text-primary); border-bottom-color: var(--bg-dark); }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .summary-card { background: var(--bg-secondary); border-radius: var(--radius-md); padding: 1.5rem; border: 1px solid var(--border); transition: all 0.3s ease; }
+        .summary-card:hover { box-shadow: 0 12px 32px var(--shadow); transform: translateY(-2px); }
+        .summary-card.income { border-top: 3px solid var(--income-sage); }
+        .summary-card.expense { border-top: 3px solid var(--expense-clay); }
+        .summary-card.profit { border-top: 3px solid var(--accent-olive); }
+        .summary-label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .summary-value { font-family: 'DM Serif Display', serif; font-size: 1.85rem; font-weight: 400; letter-spacing: -0.01em; }
+        .summary-value.positive { color: var(--income-sage); }
+        .summary-value.negative { color: var(--expense-clay); }
+        .summary-sub { font-size: 0.65rem; color: var(--text-muted); margin-top: 0.35rem; letter-spacing: 0.02em; }
+
+        .content-grid { display: grid; grid-template-columns: 1fr 320px; gap: 1.5rem; }
+        @media (max-width: 1000px) { .content-grid { grid-template-columns: 1fr; } }
+
+        .card { background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border); overflow: hidden; }
+        .card-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .card-title { font-family: 'DM Serif Display', serif; font-size: 1rem; font-weight: 400; letter-spacing: 0.01em; }
+        .card-body { padding: 1.25rem 1.5rem; }
+
+        .date-filter { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 2rem; }
+        .filter-btn { font-family: 'DM Sans', sans-serif; font-size: 0.7rem; font-weight: 500; padding: 0.5rem 1rem; border-radius: 2px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-muted); cursor: pointer; transition: all 0.2s ease; text-transform: uppercase; letter-spacing: 0.08em; }
+        .filter-btn:hover { border-color: var(--text-muted); color: var(--text-primary); }
+        .filter-btn.active { background: var(--bg-dark); color: #FFFFFF; border-color: var(--bg-dark); }
+
+        .list { max-height: 450px; overflow-y: auto; }
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); transition: background 0.15s ease; cursor: pointer; }
+        .list-item:hover { background: var(--bg-accent); }
+        .list-item:last-child { border-bottom: none; }
+        .list-item-info { flex: 1; min-width: 0; }
+        .list-item-title { font-weight: 500; font-size: 0.85rem; margin-bottom: 0.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .list-item-meta { font-size: 0.7rem; color: var(--text-muted); display: flex; gap: 0.75rem; flex-wrap: wrap; letter-spacing: 0.02em; }
+        .list-item-value { font-family: 'DM Serif Display', serif; font-size: 1.1rem; font-weight: 400; margin-left: 1rem; white-space: nowrap; }
+        .list-item-value.income { color: var(--income-sage); }
+        .list-item-value.expense { color: var(--expense-clay); }
+        .list-item-actions { display: flex; gap: 0.2rem; margin-left: 0.5rem; opacity: 0; transition: opacity 0.15s ease; }
+        .list-item:hover .list-item-actions { opacity: 1; }
+        @media (max-width: 600px) { .list-item-actions { opacity: 1; } }
+        .action-btn { width: 28px; height: 28px; border-radius: var(--radius-sm); border: none; background: transparent; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s ease; }
+        .action-btn:hover { background: var(--bg-accent); color: var(--text-primary); }
+        .action-btn.delete:hover { background: var(--expense-clay-light); color: var(--expense-clay); }
+
+        .loading-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--text-primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .empty-state { text-align: center; padding: 3rem 1.5rem; color: var(--text-muted); }
+        .empty-state svg { width: 36px; height: 36px; margin-bottom: 1rem; opacity: 0.3; stroke-width: 1; }
+        .empty-state p { font-size: 0.8rem; letter-spacing: 0.02em; }
+
+        .form-group { margin-bottom: 1.25rem; }
+        .form-label { display: block; font-size: 0.65rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.1em; }
+        .form-input, .form-select, .form-textarea { width: 100%; font-family: 'DM Sans', sans-serif; font-size: 0.875rem; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-primary); transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+        .form-input:focus, .form-select:focus, .form-textarea:focus { outline: none; border-color: var(--bg-dark); box-shadow: 0 0 0 3px rgba(28, 28, 28, 0.08); }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        @media (max-width: 400px) { .form-row { grid-template-columns: 1fr; } }
+        .type-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+        .type-btn { font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 500; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-muted); cursor: pointer; transition: all 0.2s ease; text-transform: uppercase; letter-spacing: 0.05em; }
+        .type-btn:hover { border-color: var(--text-muted); }
+        .type-btn.income.active { background: var(--income-sage-light); border-color: var(--income-sage); color: var(--income-sage); }
+        .type-btn.expense.active { background: var(--expense-clay-light); border-color: var(--expense-clay); color: var(--expense-clay); }
+
+        .pnl-section { margin-bottom: 1.5rem; }
+        .pnl-section:last-child { margin-bottom: 0; }
+        .pnl-section-title { font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+        .pnl-row { display: flex; justify-content: space-between; padding: 0.45rem 0; font-size: 0.8rem; }
+        .pnl-row.total { font-weight: 600; border-top: 1px solid var(--border); margin-top: 0.5rem; padding-top: 0.75rem; }
+        .pnl-row.net-profit { font-family: 'DM Serif Display', serif; font-size: 1.1rem; font-weight: 400; background: var(--bg-accent); margin: 0.5rem -1.5rem -1.25rem; padding: 1rem 1.5rem; }
+        .pnl-category { color: var(--text-secondary); }
+        .pnl-amount { font-weight: 500; }
+        .pnl-amount.income { color: var(--income-sage); }
+        .pnl-amount.expense { color: var(--expense-clay); }
+
+        .chart-container { height: 180px; margin-top: 0.5rem; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(28, 28, 28, 0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; visibility: hidden; transition: all 0.2s ease; padding: 1rem; backdrop-filter: blur(4px); }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal { background: var(--bg-secondary); border-radius: var(--radius-md); width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto; transform: translateY(20px); transition: transform 0.3s ease; }
+        .modal-overlay.active .modal { transform: translateY(0); }
+        .modal-header { padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-title { font-family: 'DM Serif Display', serif; font-size: 1.15rem; font-weight: 400; }
+        .modal-close { width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s ease; }
+        .modal-close:hover { background: var(--bg-accent); color: var(--text-primary); }
+        .modal-body { padding: 1.5rem; }
+        .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem; }
+
+        /* Client Cards */
+        .client-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+        .client-card { background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border); padding: 1.5rem; cursor: pointer; transition: all 0.3s ease; }
+        .client-card:hover { box-shadow: 0 16px 40px var(--shadow); transform: translateY(-3px); border-color: var(--accent-olive); }
+        .client-name { font-family: 'DM Serif Display', serif; font-size: 1.1rem; font-weight: 400; margin-bottom: 0.25rem; }
+        .client-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+        .client-stat-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); font-weight: 500; }
+        .client-stat-value { font-family: 'DM Serif Display', serif; font-size: 1.1rem; font-weight: 400; color: var(--income-sage); margin-top: 0.15rem; }
+
+        /* Mileage specific */
+        .mileage-summary { display: flex; gap: 2rem; flex-wrap: wrap; margin-bottom: 1.5rem; padding: 1.25rem 1.5rem; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border); }
+        .mileage-stat { }
+        .mileage-stat-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); font-weight: 500; }
+        .mileage-stat-value { font-family: 'DM Serif Display', serif; font-size: 1.5rem; font-weight: 400; margin-top: 0.25rem; }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        .backup-reminder { font-size: 0.6rem; padding: 0.3rem 0.6rem; background: rgba(156, 123, 107, 0.2); color: #FFFFFF; border-radius: 2px; cursor: pointer; display: none; letter-spacing: 0.05em; }
+    </style>
+</head>
+<body>
+    <div class="auth-container" id="authContainer">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <div class="auth-logo-text">Aesthetic State</div>
+                <div class="auth-logo-sub">Business Tracker</div>
+            </div>
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">Sign In</button>
+                <button class="auth-tab" data-tab="signup">Sign Up</button>
+            </div>
+            <div class="auth-error" id="authError"></div>
+            <div class="auth-success" id="authSuccess"></div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label class="form-label" for="loginEmail">Email</label>
+                    <input type="email" class="form-input" id="loginEmail" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="loginPassword">Password</label>
+                    <input type="password" class="form-input" id="loginPassword" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;" id="loginBtn">Sign In</button>
+            </form>
+            <form id="signupForm" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label" for="signupEmail">Email</label>
+                    <input type="email" class="form-input" id="signupEmail" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="signupPassword">Password</label>
+                    <input type="password" class="form-input" id="signupPassword" minlength="6" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="signupPasswordConfirm">Confirm Password</label>
+                    <input type="password" class="form-input" id="signupPasswordConfirm" minlength="6" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;" id="signupBtn">Create Account</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="app-container" id="appContainer">
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <span class="logo-text">Aesthetic State</span>
+                    <span class="logo-sub">Tracker</span>
+                </div>
+                <div class="header-actions">
+                    <span class="user-email" id="userEmail"></span>
+                    <span class="backup-reminder" id="backupReminder" onclick="exportCSV()">⚠️ Backup needed</span>
+                    <button class="btn btn-ghost" onclick="exportCSV()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Export
+                    </button>
+                    <button class="btn btn-ghost" onclick="signOut()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+        <main class="main">
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" data-tab="dashboard">Dashboard</button>
+                <button class="tab" data-tab="clients">Clients</button>
+                <button class="tab" data-tab="time">Time</button>
+                <button class="tab" data-tab="mileage">Mileage</button>
+            </div>
+
+            <!-- Dashboard Tab -->
+            <div class="tab-content active" id="dashboardTab">
+                <div class="date-filter">
+                    <button class="filter-btn active" data-filter="all">All Time</button>
+                    <button class="filter-btn" data-filter="month">This Month</button>
+                    <button class="filter-btn" data-filter="lastMonth">Last Month</button>
+                    <button class="filter-btn" data-filter="quarter">This Quarter</button>
+                    <button class="filter-btn" data-filter="year">This Year</button>
+                </div>
+                <div class="summary-grid">
+                    <div class="summary-card income">
+                        <div class="summary-label">Revenue</div>
+                        <div class="summary-value" id="totalIncome">$0</div>
+                    </div>
+                    <div class="summary-card expense">
+                        <div class="summary-label">Expenses</div>
+                        <div class="summary-value" id="totalExpenses">$0</div>
+                    </div>
+                    <div class="summary-card profit">
+                        <div class="summary-label">Net Profit</div>
+                        <div class="summary-value" id="netProfit">$0</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-label">Expense Ratio</div>
+                        <div class="summary-value" id="expenseRatio">0%</div>
+                        <div class="summary-sub">Lower is better</div>
+                    </div>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <button class="btn btn-primary" onclick="openTransactionModal()">+ Add Transaction</button>
+                </div>
+                <div class="content-grid">
+                    <div>
+                        <div class="card" style="margin-bottom: 1.5rem;">
+                            <div class="card-header"><h2 class="card-title">Transactions</h2></div>
+                            <div class="list" id="transactionList"></div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header"><h2 class="card-title">Profit Trend</h2></div>
+                            <div class="card-body"><div class="chart-container"><canvas id="profitChart"></canvas></div></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h2 class="card-title">P&L Statement</h2></div>
+                        <div class="card-body" id="pnlStatement"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clients Tab -->
+            <div class="tab-content" id="clientsTab">
+                <div style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="font-family: 'Playfair Display', serif; font-size: 1.25rem;">Clients</h2>
+                    <button class="btn btn-primary" onclick="openClientModal()">+ Add Client</button>
+                </div>
+                <div class="client-grid" id="clientGrid"></div>
+            </div>
+
+            <!-- Time Tab -->
+            <div class="tab-content" id="timeTab">
+                <div style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <h2 style="font-family: 'Playfair Display', serif; font-size: 1.25rem;">Time Tracking</h2>
+                    <button class="btn btn-primary" onclick="openTimeModal()">+ Log Time</button>
+                </div>
+                <div class="summary-grid" style="margin-bottom: 1.5rem;">
+                    <div class="summary-card">
+                        <div class="summary-label">Total Hours</div>
+                        <div class="summary-value" id="totalHours">0</div>
+                    </div>
+                    <div class="summary-card profit">
+                        <div class="summary-label">Avg Hourly Rate</div>
+                        <div class="summary-value" id="avgHourlyRate">$0</div>
+                        <div class="summary-sub">Revenue ÷ Hours</div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h2 class="card-title">Time Entries</h2></div>
+                    <div class="list" id="timeList"></div>
+                </div>
+            </div>
+
+            <!-- Mileage Tab -->
+            <div class="tab-content" id="mileageTab">
+                <div style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <h2 style="font-family: 'Playfair Display', serif; font-size: 1.25rem;">Mileage Tracker</h2>
+                    <button class="btn btn-primary" onclick="openMileageModal()">+ Log Trip</button>
+                </div>
+                <div class="mileage-summary">
+                    <div class="mileage-stat">
+                        <div class="mileage-stat-label">Total Miles</div>
+                        <div class="mileage-stat-value" id="totalMiles">0</div>
+                    </div>
+                    <div class="mileage-stat">
+                        <div class="mileage-stat-label">Tax Deduction (67¢/mi)</div>
+                        <div class="mileage-stat-value" id="mileageDeduction">$0</div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h2 class="card-title">Trips</h2></div>
+                    <div class="list" id="mileageList"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Transaction Modal -->
+    <div class="modal-overlay" id="transactionModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="transactionModalTitle">Add Transaction</h3>
+                <button class="modal-close" onclick="closeTransactionModal()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <div class="modal-body">
+                <form id="transactionForm">
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <div class="type-toggle">
+                            <button type="button" class="type-btn income active" data-type="income">Income</button>
+                            <button type="button" class="type-btn expense" data-type="expense">Expense</button>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="txnDate">Date</label>
+                            <input type="date" class="form-input" id="txnDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="txnAmount">Amount</label>
+                            <input type="number" class="form-input" id="txnAmount" step="0.01" min="0" placeholder="0.00" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="txnClient">Client (optional)</label>
+                        <select class="form-select" id="txnClient"><option value="">-- No Client --</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="txnCategory">Category</label>
+                        <select class="form-select" id="txnCategory" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="txnDescription">Description</label>
+                        <input type="text" class="form-input" id="txnDescription" placeholder="What was this for?" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="txnNotes">Notes (optional)</label>
+                        <textarea class="form-textarea" id="txnNotes" rows="2" placeholder="Any additional details..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeTransactionModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveTransaction()" id="saveTxnBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client Modal -->
+    <div class="modal-overlay" id="clientModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="clientModalTitle">Add Client</h3>
+                <button class="modal-close" onclick="closeClientModal()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <div class="modal-body">
+                <form id="clientForm">
+                    <div class="form-group">
+                        <label class="form-label" for="clientName">Client Name</label>
+                        <input type="text" class="form-input" id="clientName" placeholder="e.g., Smith Family" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="clientEmail">Email (optional)</label>
+                        <input type="email" class="form-input" id="clientEmail" placeholder="client@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="clientPhone">Phone (optional)</label>
+                        <input type="tel" class="form-input" id="clientPhone" placeholder="(555) 123-4567">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="clientNotes">Notes (optional)</label>
+                        <textarea class="form-textarea" id="clientNotes" rows="2" placeholder="Project details, preferences, etc."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeClientModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveClient()" id="saveClientBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Time Modal -->
+    <div class="modal-overlay" id="timeModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="timeModalTitle">Log Time</h3>
+                <button class="modal-close" onclick="closeTimeModal()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <div class="modal-body">
+                <form id="timeForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="timeDate">Date</label>
+                            <input type="date" class="form-input" id="timeDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="timeHours">Hours</label>
+                            <input type="number" class="form-input" id="timeHours" step="0.25" min="0" placeholder="0.0" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="timeClient">Client</label>
+                        <select class="form-select" id="timeClient" required><option value="">-- Select Client --</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="timeDescription">What did you work on?</label>
+                        <input type="text" class="form-input" id="timeDescription" placeholder="e.g., Initial consultation, mood board" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeTimeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveTimeEntry()" id="saveTimeBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mileage Modal -->
+    <div class="modal-overlay" id="mileageModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="mileageModalTitle">Log Trip</h3>
+                <button class="modal-close" onclick="closeMileageModal()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <div class="modal-body">
+                <form id="mileageForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="mileageDate">Date</label>
+                            <input type="date" class="form-input" id="mileageDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="mileageMiles">Miles</label>
+                            <input type="number" class="form-input" id="mileageMiles" step="0.1" min="0" placeholder="0.0" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="mileageClient">Client (optional)</label>
+                        <select class="form-select" id="mileageClient"><option value="">-- No Client --</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="mileageDescription">Trip Purpose</label>
+                        <input type="text" class="form-input" id="mileageDescription" placeholder="e.g., Site visit, showroom trip" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeMileageModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveMileage()" id="saveMileageBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client Detail Modal -->
+    <div class="modal-overlay" id="clientDetailModal">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="clientDetailName">Client Name</h3>
+                <button class="modal-close" onclick="closeClientDetailModal()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <div class="modal-body" id="clientDetailBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="editClientFromDetail()">Edit</button>
+                <button class="btn btn-ghost" style="color: var(--expense-terra);" onclick="deleteClientFromDetail()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://bzihzomukmmqsijukdmn.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ6aWh6b211a21tcXNpanVrZG1uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwMzE5MjEsImV4cCI6MjA4NDYwNzkyMX0.y7k2kZyr1cuXOn8lJKWJwrOdR4fp-fWb1KDDpTT7BlY';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const categories = {
+            income: ['Invoice', 'Retainer', 'Cash Back', 'Commission', 'Reimbursement', 'Consult', 'Other Income'],
+            expense: ['Business Fees', 'Client Purchases', 'Marketing', 'Houzz', 'GoDaddy', 'ATAP Taxes', 'Accountant', 'Other Expenses']
+        };
+
+        let transactions = [], clients = [], timeEntries = [], mileageEntries = [];
+        let currentType = 'income', currentFilter = 'all', currentUser = null;
+        let editingTxnId = null, editingClientId = null, editingTimeId = null, editingMileageId = null, viewingClientId = null;
+        let profitChart = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            setupAuthListeners();
+            setupEventListeners();
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) { currentUser = session.user; showApp(); await loadAllData(); }
+        });
+
+        function setupAuthListeners() {
+            document.querySelectorAll('.auth-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    const isLogin = tab.dataset.tab === 'login';
+                    document.getElementById('loginForm').style.display = isLogin ? 'block' : 'none';
+                    document.getElementById('signupForm').style.display = isLogin ? 'none' : 'block';
+                    hideAuthMessages();
+                });
+            });
+            document.getElementById('loginForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('loginBtn');
+                btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>'; hideAuthMessages();
+                const { data, error } = await supabase.auth.signInWithPassword({ email: document.getElementById('loginEmail').value, password: document.getElementById('loginPassword').value });
+                btn.disabled = false; btn.textContent = 'Sign In';
+                if (error) showAuthError(error.message);
+                else { currentUser = data.user; showApp(); await loadAllData(); }
+            });
+            document.getElementById('signupForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('signupBtn');
+                btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>'; hideAuthMessages();
+                const password = document.getElementById('signupPassword').value;
+                if (password !== document.getElementById('signupPasswordConfirm').value) { showAuthError('Passwords do not match'); btn.disabled = false; btn.textContent = 'Create Account'; return; }
+                const { data, error } = await supabase.auth.signUp({ email: document.getElementById('signupEmail').value, password });
+                btn.disabled = false; btn.textContent = 'Create Account';
+                if (error) showAuthError(error.message);
+                else if (data.user && !data.session) showAuthSuccess('Check your email for a confirmation link!');
+                else { currentUser = data.user; showApp(); await loadAllData(); }
+            });
+        }
+
+        function showAuthError(msg) { const el = document.getElementById('authError'); el.textContent = msg; el.classList.add('show'); }
+        function showAuthSuccess(msg) { const el = document.getElementById('authSuccess'); el.textContent = msg; el.classList.add('show'); }
+        function hideAuthMessages() { document.getElementById('authError').classList.remove('show'); document.getElementById('authSuccess').classList.remove('show'); }
+        function showApp() { document.getElementById('authContainer').style.display = 'none'; document.getElementById('appContainer').classList.add('show'); document.getElementById('userEmail').textContent = currentUser.email; updateBackupReminder(); }
+        async function signOut() { await supabase.auth.signOut(); currentUser = null; transactions = []; clients = []; timeEntries = []; mileageEntries = []; document.getElementById('authContainer').style.display = 'flex'; document.getElementById('appContainer').classList.remove('show'); }
+
+        function setupEventListeners() {
+            // Type toggle
+            document.querySelectorAll('.type-btn').forEach(btn => btn.addEventListener('click', () => { document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); currentType = btn.dataset.type; updateCategoryOptions(); }));
+            // Date filter
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.addEventListener('click', () => { document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); currentFilter = btn.dataset.filter; renderDashboard(); }));
+            // Tab navigation
+            document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => { document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); tab.classList.add('active'); document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); document.getElementById(tab.dataset.tab + 'Tab').classList.add('active'); }));
+            // Modal close on overlay click
+            document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', (e) => { if (e.target.classList.contains('modal-overlay')) { e.target.classList.remove('active'); } }));
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active')); });
+        }
+
+        async function loadAllData() {
+            const [txnRes, clientRes, timeRes, mileageRes] = await Promise.all([
+                supabase.from('as_transactions').select('*').order('date', { ascending: false }),
+                supabase.from('as_clients').select('*').order('name'),
+                supabase.from('as_time_entries').select('*').order('date', { ascending: false }),
+                supabase.from('as_mileage').select('*').order('date', { ascending: false })
+            ]);
+            transactions = txnRes.data || [];
+            clients = clientRes.data || [];
+            timeEntries = timeRes.data || [];
+            mileageEntries = mileageRes.data || [];
+            renderAll();
+        }
+
+        function renderAll() {
+            renderDashboard();
+            renderClients();
+            renderTimeEntries();
+            renderMileage();
+            updateClientDropdowns();
+        }
+
+        function updateClientDropdowns() {
+            const options = '<option value="">-- No Client --</option>' + clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+            const optionsRequired = '<option value="">-- Select Client --</option>' + clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+            document.getElementById('txnClient').innerHTML = options;
+            document.getElementById('timeClient').innerHTML = optionsRequired;
+            document.getElementById('mileageClient').innerHTML = options;
+        }
+
+        function updateCategoryOptions() {
+            document.getElementById('txnCategory').innerHTML = categories[currentType].map(c => `<option value="${c}">${c}</option>`).join('');
+        }
+
+        function filterTransactions() {
+            const now = new Date(), cm = now.getMonth(), cy = now.getFullYear();
+            return transactions.filter(t => {
+                const d = new Date(t.date);
+                if (currentFilter === 'month') return d.getMonth() === cm && d.getFullYear() === cy;
+                if (currentFilter === 'lastMonth') { const lm = cm === 0 ? 11 : cm - 1, ly = cm === 0 ? cy - 1 : cy; return d.getMonth() === lm && d.getFullYear() === ly; }
+                if (currentFilter === 'quarter') return Math.floor(d.getMonth() / 3) === Math.floor(cm / 3) && d.getFullYear() === cy;
+                if (currentFilter === 'year') return d.getFullYear() === cy;
+                return true;
+            });
+        }
+
+        function renderDashboard() {
+            const f = filterTransactions();
+            const inc = f.filter(t => t.type === 'income').reduce((s, t) => s + parseFloat(t.amount), 0);
+            const exp = f.filter(t => t.type === 'expense').reduce((s, t) => s + parseFloat(t.amount), 0);
+            const expenseRatio = inc > 0 ? Math.round((exp / inc) * 100) : 0;
+            document.getElementById('totalIncome').textContent = formatCurrency(inc);
+            document.getElementById('totalExpenses').textContent = formatCurrency(exp);
+            document.getElementById('expenseRatio').textContent = expenseRatio + '%';
+            const pe = document.getElementById('netProfit'); pe.textContent = formatCurrency(inc - exp); pe.className = 'summary-value ' + (inc - exp >= 0 ? 'positive' : 'negative');
+            renderTransactionList();
+            renderPnL();
+            renderChart();
+        }
+
+        function renderTransactionList() {
+            const c = document.getElementById('transactionList'), f = filterTransactions();
+            if (!f.length) { c.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg><p>No transactions yet</p></div>'; return; }
+            c.innerHTML = f.map(t => {
+                const client = clients.find(cl => cl.id === t.client_id);
+                return `<div class="list-item" onclick="editTransaction('${t.id}')"><div class="list-item-info"><div class="list-item-title">${escapeHtml(t.description)}</div><div class="list-item-meta"><span>${formatDate(t.date)}</span><span>${escapeHtml(t.category)}</span>${client ? `<span>• ${escapeHtml(client.name)}</span>` : ''}</div></div><div class="list-item-value ${t.type}">${t.type === 'expense' ? '-' : '+'}${formatCurrency(parseFloat(t.amount))}</div><div class="list-item-actions"><button class="action-btn delete" onclick="event.stopPropagation(); deleteTransaction('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div></div>`;
+            }).join('');
+        }
+
+        function renderPnL() {
+            const c = document.getElementById('pnlStatement'), f = filterTransactions(), ibc = {}, ebc = {};
+            f.forEach(t => { if (t.type === 'income') ibc[t.category] = (ibc[t.category] || 0) + parseFloat(t.amount); else ebc[t.category] = (ebc[t.category] || 0) + parseFloat(t.amount); });
+            const ti = Object.values(ibc).reduce((a, b) => a + b, 0), te = Object.values(ebc).reduce((a, b) => a + b, 0);
+            const incomeWithPct = Object.entries(ibc).map(([k, v]) => ({ cat: k, amt: v, pct: ti > 0 ? Math.round((v / ti) * 100) : 0 })).sort((a, b) => b.amt - a.amt);
+            const expenseWithPct = Object.entries(ebc).map(([k, v]) => ({ cat: k, amt: v, pct: te > 0 ? Math.round((v / te) * 100) : 0 })).sort((a, b) => b.amt - a.amt);
+            c.innerHTML = `<div class="pnl-section"><div class="pnl-section-title">Revenue</div>${incomeWithPct.map(x => `<div class="pnl-row"><span class="pnl-category">${escapeHtml(x.cat)} <span style="color:var(--income-green);font-weight:600">${x.pct}%</span></span><span class="pnl-amount income">${formatCurrency(x.amt)}</span></div>`).join('') || '<div class="pnl-row"><span class="pnl-category" style="color:var(--text-muted)">No income recorded</span></div>'}<div class="pnl-row total"><span>Total Revenue</span><span class="pnl-amount income">${formatCurrency(ti)}</span></div></div><div class="pnl-section"><div class="pnl-section-title">Expenses</div>${expenseWithPct.map(x => `<div class="pnl-row"><span class="pnl-category">${escapeHtml(x.cat)} <span style="color:var(--expense-terra);font-weight:600">${x.pct}%</span></span><span class="pnl-amount expense">${formatCurrency(x.amt)}</span></div>`).join('') || '<div class="pnl-row"><span class="pnl-category" style="color:var(--text-muted)">No expenses recorded</span></div>'}<div class="pnl-row total"><span>Total Expenses</span><span class="pnl-amount expense">${formatCurrency(te)}</span></div></div><div class="pnl-section"><div class="pnl-row net-profit"><span>Net Profit</span><span class="pnl-amount ${ti - te >= 0 ? 'income' : 'expense'}">${formatCurrency(ti - te)}</span></div></div>`;
+        }
+
+        function renderChart() {
+            const ctx = document.getElementById('profitChart').getContext('2d'), f = filterTransactions(), md = {};
+            f.forEach(t => { const mk = t.date.substring(0, 7); if (!md[mk]) md[mk] = { income: 0, expense: 0 }; if (t.type === 'income') md[mk].income += parseFloat(t.amount); else md[mk].expense += parseFloat(t.amount); });
+            const sm = Object.keys(md).sort(), labels = sm.map(m => { const [y, mo] = m.split('-'); return new Date(y, mo - 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }); }), profits = sm.map(m => md[m].income - md[m].expense);
+            if (profitChart) profitChart.destroy();
+            profitChart = new Chart(ctx, { type: 'bar', data: { labels, datasets: [{ label: 'Profit', data: profits, backgroundColor: profits.map(p => p >= 0 ? 'rgba(107,123,100,0.85)' : 'rgba(156,123,107,0.85)'), borderColor: profits.map(p => p >= 0 ? '#6B7B64' : '#9C7B6B'), borderWidth: 1, borderRadius: 2 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(217,214,207,0.5)' }, ticks: { callback: v => '$' + v.toLocaleString() } }, x: { grid: { display: false } } } } });
+        }
+
+        function renderClients() {
+            const c = document.getElementById('clientGrid');
+            if (!clients.length) { c.innerHTML = '<div class="empty-state" style="grid-column: 1/-1;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><p>No clients yet</p></div>'; return; }
+            c.innerHTML = clients.map(cl => {
+                const clientTxns = transactions.filter(t => t.client_id === cl.id && t.type === 'income');
+                const clientRevenue = clientTxns.reduce((s, t) => s + parseFloat(t.amount), 0);
+                const clientHours = timeEntries.filter(te => te.client_id === cl.id).reduce((s, te) => s + parseFloat(te.hours), 0);
+                const hourlyRate = clientHours > 0 ? clientRevenue / clientHours : 0;
+                return `<div class="client-card" onclick="viewClient('${cl.id}')"><div class="client-name">${escapeHtml(cl.name)}</div><div class="client-stats"><div><div class="client-stat-label">Revenue</div><div class="client-stat-value">${formatCurrency(clientRevenue)}</div></div><div><div class="client-stat-label">Eff. Hourly</div><div class="client-stat-value">${formatCurrency(hourlyRate)}</div></div></div></div>`;
+            }).join('');
+        }
+
+        function renderTimeEntries() {
+            const totalHours = timeEntries.reduce((s, te) => s + parseFloat(te.hours), 0);
+            const totalRevenue = transactions.filter(t => t.type === 'income').reduce((s, t) => s + parseFloat(t.amount), 0);
+            document.getElementById('totalHours').textContent = totalHours.toFixed(1);
+            document.getElementById('avgHourlyRate').textContent = totalHours > 0 ? formatCurrency(totalRevenue / totalHours) : '$0';
+            const c = document.getElementById('timeList');
+            if (!timeEntries.length) { c.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><p>No time logged yet</p></div>'; return; }
+            c.innerHTML = timeEntries.map(te => {
+                const client = clients.find(cl => cl.id === te.client_id);
+                return `<div class="list-item" onclick="editTimeEntry('${te.id}')"><div class="list-item-info"><div class="list-item-title">${escapeHtml(te.description)}</div><div class="list-item-meta"><span>${formatDate(te.date)}</span>${client ? `<span>• ${escapeHtml(client.name)}</span>` : ''}</div></div><div class="list-item-value">${parseFloat(te.hours).toFixed(1)}h</div><div class="list-item-actions"><button class="action-btn delete" onclick="event.stopPropagation(); deleteTimeEntry('${te.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div></div>`;
+            }).join('');
+        }
+
+        function renderMileage() {
+            const totalMiles = mileageEntries.reduce((s, m) => s + parseFloat(m.miles), 0);
+            document.getElementById('totalMiles').textContent = totalMiles.toFixed(1);
+            document.getElementById('mileageDeduction').textContent = formatCurrency(totalMiles * 0.67);
+            const c = document.getElementById('mileageList');
+            if (!mileageEntries.length) { c.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg><p>No trips logged yet</p></div>'; return; }
+            c.innerHTML = mileageEntries.map(m => {
+                const client = clients.find(cl => cl.id === m.client_id);
+                return `<div class="list-item" onclick="editMileage('${m.id}')"><div class="list-item-info"><div class="list-item-title">${escapeHtml(m.description)}</div><div class="list-item-meta"><span>${formatDate(m.date)}</span>${client ? `<span>• ${escapeHtml(client.name)}</span>` : ''}</div></div><div class="list-item-value">${parseFloat(m.miles).toFixed(1)} mi</div><div class="list-item-actions"><button class="action-btn delete" onclick="event.stopPropagation(); deleteMileage('${m.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div></div>`;
+            }).join('');
+        }
+
+        // Transaction Modal
+        function openTransactionModal(id = null) {
+            editingTxnId = id;
+            document.getElementById('transactionModalTitle').textContent = id ? 'Edit Transaction' : 'Add Transaction';
+            if (id) {
+                const t = transactions.find(x => x.id === id);
+                if (t) { document.getElementById('txnDate').value = t.date; document.getElementById('txnAmount').value = t.amount; document.getElementById('txnDescription').value = t.description; document.getElementById('txnNotes').value = t.notes || ''; document.getElementById('txnClient').value = t.client_id || ''; currentType = t.type; document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === t.type)); updateCategoryOptions(); document.getElementById('txnCategory').value = t.category; }
+            } else { document.getElementById('transactionForm').reset(); document.getElementById('txnDate').value = new Date().toISOString().split('T')[0]; currentType = 'income'; document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'income')); updateCategoryOptions(); }
+            document.getElementById('transactionModal').classList.add('active');
+        }
+        function closeTransactionModal() { document.getElementById('transactionModal').classList.remove('active'); editingTxnId = null; }
+        function editTransaction(id) { openTransactionModal(id); }
+        async function saveTransaction() {
+            const form = document.getElementById('transactionForm'); if (!form.checkValidity()) { form.reportValidity(); return; }
+            const btn = document.getElementById('saveTxnBtn'); btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>';
+            const data = { user_id: currentUser.id, type: currentType, date: document.getElementById('txnDate').value, amount: parseFloat(document.getElementById('txnAmount').value), category: document.getElementById('txnCategory').value, description: document.getElementById('txnDescription').value, notes: document.getElementById('txnNotes').value || null, client_id: document.getElementById('txnClient').value || null };
+            let error; if (editingTxnId) { const r = await supabase.from('as_transactions').update(data).eq('id', editingTxnId); error = r.error; } else { const r = await supabase.from('as_transactions').insert([data]); error = r.error; }
+            btn.disabled = false; btn.textContent = 'Save';
+            if (error) { alert('Error saving transaction.'); console.error(error); return; }
+            await loadAllData(); closeTransactionModal();
+        }
+        async function deleteTransaction(id) { if (!confirm('Delete this transaction?')) return; await supabase.from('as_transactions').delete().eq('id', id); await loadAllData(); }
+
+        // Client Modal
+        function openClientModal(id = null) {
+            editingClientId = id;
+            document.getElementById('clientModalTitle').textContent = id ? 'Edit Client' : 'Add Client';
+            if (id) { const cl = clients.find(x => x.id === id); if (cl) { document.getElementById('clientName').value = cl.name; document.getElementById('clientEmail').value = cl.email || ''; document.getElementById('clientPhone').value = cl.phone || ''; document.getElementById('clientNotes').value = cl.notes || ''; } }
+            else { document.getElementById('clientForm').reset(); }
+            document.getElementById('clientModal').classList.add('active');
+        }
+        function closeClientModal() { document.getElementById('clientModal').classList.remove('active'); editingClientId = null; }
+        async function saveClient() {
+            const form = document.getElementById('clientForm'); if (!form.checkValidity()) { form.reportValidity(); return; }
+            const btn = document.getElementById('saveClientBtn'); btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>';
+            const data = { user_id: currentUser.id, name: document.getElementById('clientName').value, email: document.getElementById('clientEmail').value || null, phone: document.getElementById('clientPhone').value || null, notes: document.getElementById('clientNotes').value || null };
+            let error; if (editingClientId) { const r = await supabase.from('as_clients').update(data).eq('id', editingClientId); error = r.error; } else { const r = await supabase.from('as_clients').insert([data]); error = r.error; }
+            btn.disabled = false; btn.textContent = 'Save';
+            if (error) { alert('Error saving client.'); console.error(error); return; }
+            await loadAllData(); closeClientModal(); closeClientDetailModal();
+        }
+
+        // Client Detail Modal
+        function viewClient(id) {
+            viewingClientId = id;
+            const cl = clients.find(x => x.id === id);
+            if (!cl) return;
+            document.getElementById('clientDetailName').textContent = cl.name;
+            const clientTxns = transactions.filter(t => t.client_id === id);
+            const clientTime = timeEntries.filter(te => te.client_id === id);
+            const clientMileage = mileageEntries.filter(m => m.client_id === id);
+            const revenue = clientTxns.filter(t => t.type === 'income').reduce((s, t) => s + parseFloat(t.amount), 0);
+            const expenses = clientTxns.filter(t => t.type === 'expense').reduce((s, t) => s + parseFloat(t.amount), 0);
+            const hours = clientTime.reduce((s, te) => s + parseFloat(te.hours), 0);
+            const miles = clientMileage.reduce((s, m) => s + parseFloat(m.miles), 0);
+            const hourlyRate = hours > 0 ? revenue / hours : 0;
+            document.getElementById('clientDetailBody').innerHTML = `
+                <div class="summary-grid" style="margin-bottom: 1rem;">
+                    <div class="summary-card income"><div class="summary-label">Revenue</div><div class="summary-value">${formatCurrency(revenue)}</div></div>
+                    <div class="summary-card expense"><div class="summary-label">Expenses</div><div class="summary-value">${formatCurrency(expenses)}</div></div>
+                    <div class="summary-card"><div class="summary-label">Hours</div><div class="summary-value">${hours.toFixed(1)}</div></div>
+                    <div class="summary-card profit"><div class="summary-label">Eff. Hourly</div><div class="summary-value">${formatCurrency(hourlyRate)}</div></div>
+                </div>
+                ${cl.email ? `<p style="font-size: 0.85rem; margin-bottom: 0.25rem;"><strong>Email:</strong> ${escapeHtml(cl.email)}</p>` : ''}
+                ${cl.phone ? `<p style="font-size: 0.85rem; margin-bottom: 0.25rem;"><strong>Phone:</strong> ${escapeHtml(cl.phone)}</p>` : ''}
+                ${cl.notes ? `<p style="font-size: 0.85rem; margin-bottom: 0.25rem;"><strong>Notes:</strong> ${escapeHtml(cl.notes)}</p>` : ''}
+                <div style="margin-top: 1rem;"><h4 style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem;">Recent Transactions</h4>
+                ${clientTxns.slice(0, 5).map(t => `<div style="font-size: 0.8rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between;"><span>${formatDate(t.date)} - ${escapeHtml(t.description)}</span><span class="${t.type === 'income' ? 'pnl-amount income' : 'pnl-amount expense'}">${t.type === 'expense' ? '-' : ''}${formatCurrency(parseFloat(t.amount))}</span></div>`).join('') || '<p style="font-size: 0.8rem; color: var(--text-muted);">No transactions</p>'}
+                </div>
+            `;
+            document.getElementById('clientDetailModal').classList.add('active');
+        }
+        function closeClientDetailModal() { document.getElementById('clientDetailModal').classList.remove('active'); viewingClientId = null; }
+        function editClientFromDetail() { closeClientDetailModal(); openClientModal(viewingClientId); }
+        async function deleteClientFromDetail() { if (!confirm('Delete this client? Their transactions will remain but be unlinked.')) return; await supabase.from('as_clients').delete().eq('id', viewingClientId); closeClientDetailModal(); await loadAllData(); }
+
+        // Time Modal
+        function openTimeModal(id = null) {
+            editingTimeId = id;
+            document.getElementById('timeModalTitle').textContent = id ? 'Edit Time Entry' : 'Log Time';
+            if (id) { const te = timeEntries.find(x => x.id === id); if (te) { document.getElementById('timeDate').value = te.date; document.getElementById('timeHours').value = te.hours; document.getElementById('timeClient').value = te.client_id || ''; document.getElementById('timeDescription').value = te.description; } }
+            else { document.getElementById('timeForm').reset(); document.getElementById('timeDate').value = new Date().toISOString().split('T')[0]; }
+            document.getElementById('timeModal').classList.add('active');
+        }
+        function closeTimeModal() { document.getElementById('timeModal').classList.remove('active'); editingTimeId = null; }
+        function editTimeEntry(id) { openTimeModal(id); }
+        async function saveTimeEntry() {
+            const form = document.getElementById('timeForm'); if (!form.checkValidity()) { form.reportValidity(); return; }
+            const btn = document.getElementById('saveTimeBtn'); btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>';
+            const data = { user_id: currentUser.id, date: document.getElementById('timeDate').value, hours: parseFloat(document.getElementById('timeHours').value), client_id: document.getElementById('timeClient').value || null, description: document.getElementById('timeDescription').value };
+            let error; if (editingTimeId) { const r = await supabase.from('as_time_entries').update(data).eq('id', editingTimeId); error = r.error; } else { const r = await supabase.from('as_time_entries').insert([data]); error = r.error; }
+            btn.disabled = false; btn.textContent = 'Save';
+            if (error) { alert('Error saving time entry.'); console.error(error); return; }
+            await loadAllData(); closeTimeModal();
+        }
+        async function deleteTimeEntry(id) { if (!confirm('Delete this time entry?')) return; await supabase.from('as_time_entries').delete().eq('id', id); await loadAllData(); }
+
+        // Mileage Modal
+        function openMileageModal(id = null) {
+            editingMileageId = id;
+            document.getElementById('mileageModalTitle').textContent = id ? 'Edit Trip' : 'Log Trip';
+            if (id) { const m = mileageEntries.find(x => x.id === id); if (m) { document.getElementById('mileageDate').value = m.date; document.getElementById('mileageMiles').value = m.miles; document.getElementById('mileageClient').value = m.client_id || ''; document.getElementById('mileageDescription').value = m.description; } }
+            else { document.getElementById('mileageForm').reset(); document.getElementById('mileageDate').value = new Date().toISOString().split('T')[0]; }
+            document.getElementById('mileageModal').classList.add('active');
+        }
+        function closeMileageModal() { document.getElementById('mileageModal').classList.remove('active'); editingMileageId = null; }
+        function editMileage(id) { openMileageModal(id); }
+        async function saveMileage() {
+            const form = document.getElementById('mileageForm'); if (!form.checkValidity()) { form.reportValidity(); return; }
+            const btn = document.getElementById('saveMileageBtn'); btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>';
+            const data = { user_id: currentUser.id, date: document.getElementById('mileageDate').value, miles: parseFloat(document.getElementById('mileageMiles').value), client_id: document.getElementById('mileageClient').value || null, description: document.getElementById('mileageDescription').value };
+            let error; if (editingMileageId) { const r = await supabase.from('as_mileage').update(data).eq('id', editingMileageId); error = r.error; } else { const r = await supabase.from('as_mileage').insert([data]); error = r.error; }
+            btn.disabled = false; btn.textContent = 'Save';
+            if (error) { alert('Error saving trip.'); console.error(error); return; }
+            await loadAllData(); closeMileageModal();
+        }
+        async function deleteMileage(id) { if (!confirm('Delete this trip?')) return; await supabase.from('as_mileage').delete().eq('id', id); await loadAllData(); }
+
+        // Export
+        function exportCSV() {
+            let csv = 'TRANSACTIONS\nDate,Type,Category,Client,Description,Amount,Notes\n';
+            transactions.forEach(t => { const cl = clients.find(c => c.id === t.client_id); csv += `${t.date},${t.type},${t.category},"${cl ? cl.name : ''}","${t.description.replace(/"/g, '""')}",${t.amount},"${(t.notes || '').replace(/"/g, '""')}"\n`; });
+            csv += '\nCLIENTS\nName,Email,Phone,Notes\n';
+            clients.forEach(c => { csv += `"${c.name.replace(/"/g, '""')}","${c.email || ''}","${c.phone || ''}","${(c.notes || '').replace(/"/g, '""')}"\n`; });
+            csv += '\nTIME ENTRIES\nDate,Client,Hours,Description\n';
+            timeEntries.forEach(te => { const cl = clients.find(c => c.id === te.client_id); csv += `${te.date},"${cl ? cl.name : ''}",${te.hours},"${te.description.replace(/"/g, '""')}"\n`; });
+            csv += '\nMILEAGE\nDate,Client,Miles,Description\n';
+            mileageEntries.forEach(m => { const cl = clients.find(c => c.id === m.client_id); csv += `${m.date},"${cl ? cl.name : ''}",${m.miles},"${m.description.replace(/"/g, '""')}"\n`; });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `aesthetic_state_${new Date().toISOString().split('T')[0]}.csv`; a.click();
+            localStorage.setItem('lastExport', new Date().toISOString()); updateBackupReminder();
+        }
+
+        function updateBackupReminder() {
+            const reminder = document.getElementById('backupReminder');
+            const lastExport = localStorage.getItem('lastExport');
+            if (!lastExport) { reminder.style.display = 'inline'; reminder.textContent = '⚠️ Never backed up'; return; }
+            const daysSince = Math.floor((new Date() - new Date(lastExport)) / (1000 * 60 * 60 * 24));
+            if (daysSince >= 30) { reminder.style.display = 'inline'; reminder.textContent = `⚠️ Backup: ${daysSince}d ago`; } else { reminder.style.display = 'none'; }
+        }
+
+        function formatCurrency(n) { return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n); }
+        function formatDate(d) { return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+        function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    </script>
+</body>
+</html>
