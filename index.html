@@ -343,16 +343,53 @@
                     <h2 style="font-family: 'Playfair Display', serif; font-size: 1.25rem;">Mileage Tracker</h2>
                     <button class="btn btn-primary" onclick="openMileageModal()">+ Log Trip</button>
                 </div>
-                <div class="mileage-summary">
-                    <div class="mileage-stat">
-                        <div class="mileage-stat-label">Total Miles</div>
-                        <div class="mileage-stat-value" id="totalMiles">0</div>
+                <div class="summary-grid" style="margin-bottom: 1.5rem;">
+                    <div class="summary-card">
+                        <div class="summary-label">Total Miles</div>
+                        <div class="summary-value" id="totalMiles">0</div>
+                        <div class="summary-sub">Tax Deduction: <span id="mileageDeduction">$0</span></div>
                     </div>
-                    <div class="mileage-stat">
-                        <div class="mileage-stat-label">Tax Deduction (67¢/mi)</div>
-                        <div class="mileage-stat-value" id="mileageDeduction">$0</div>
+                    <div class="summary-card">
+                        <div class="summary-label">Alex's Miles</div>
+                        <div class="summary-value" id="alexMiles">0</div>
+                        <div class="summary-sub">Tax Deduction: <span id="alexDeduction">$0</span></div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-label">Tyna's Miles</div>
+                        <div class="summary-value" id="tynaMiles">0</div>
+                        <div class="summary-sub">Tax Deduction: <span id="tynaDeduction">$0</span></div>
                     </div>
                 </div>
+
+                <!-- Mileage Deduction Calculator -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header"><h2 class="card-title">Deduction Calculator</h2></div>
+                    <div class="card-body">
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">Calculate your mileage tax deduction using the IRS standard rate (67¢/mile for 2024).</p>
+                        <div class="form-row">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label" for="calcMiles">Miles to Calculate</label>
+                                <input type="number" class="form-input" id="calcMiles" step="0.1" min="0" placeholder="Enter miles" oninput="calculateDeduction()">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label" for="calcRate">Rate (¢/mile)</label>
+                                <input type="number" class="form-input" id="calcRate" step="0.5" min="0" value="67" oninput="calculateDeduction()">
+                            </div>
+                        </div>
+                        <div style="margin-top: 1rem; padding: 1rem; background: var(--bg-accent); border-radius: var(--radius-sm);">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted);">Estimated Deduction</span>
+                                <span style="font-family: 'DM Serif Display', serif; font-size: 1.5rem; color: var(--income-sage);" id="calcResult">$0</span>
+                            </div>
+                        </div>
+                        <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <button class="btn btn-secondary" style="font-size: 0.7rem;" onclick="useTrackedMiles('all')">Use All Tracked Miles</button>
+                            <button class="btn btn-secondary" style="font-size: 0.7rem;" onclick="useTrackedMiles('Alex')">Use Alex's Miles</button>
+                            <button class="btn btn-secondary" style="font-size: 0.7rem;" onclick="useTrackedMiles('Tyna')">Use Tyna's Miles</button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="card-header"><h2 class="card-title">Trips</h2></div>
                     <div class="list" id="mileageList"></div>
@@ -424,6 +461,11 @@
                     <div class="form-group">
                         <label class="form-label" for="clientName">Client Name</label>
                         <input type="text" class="form-input" id="clientName" placeholder="e.g., Smith Family" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="clientHourlyRate">Hourly Rate ($)</label>
+                        <input type="number" class="form-input" id="clientHourlyRate" step="0.01" min="0" placeholder="e.g., 150.00">
+                        <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem;">What this client pays per hour</p>
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="clientEmail">Email (optional)</label>
@@ -500,6 +542,14 @@
                             <label class="form-label" for="mileageMiles">Miles</label>
                             <input type="number" class="form-input" id="mileageMiles" step="0.1" min="0" placeholder="0.0" required>
                         </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="mileageDriver">Driver</label>
+                        <select class="form-select" id="mileageDriver" required>
+                            <option value="">-- Select Driver --</option>
+                            <option value="Alex">Alex</option>
+                            <option value="Tyna">Tyna</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="mileageClient">Client (optional)</label>
@@ -700,8 +750,9 @@
                 const clientTxns = transactions.filter(t => t.client_id === cl.id && t.type === 'income');
                 const clientRevenue = clientTxns.reduce((s, t) => s + parseFloat(t.amount), 0);
                 const clientHours = timeEntries.filter(te => te.client_id === cl.id).reduce((s, te) => s + parseFloat(te.hours), 0);
-                const hourlyRate = clientHours > 0 ? clientRevenue / clientHours : 0;
-                return `<div class="client-card" onclick="viewClient('${cl.id}')"><div class="client-name">${escapeHtml(cl.name)}</div><div class="client-stats"><div><div class="client-stat-label">Revenue</div><div class="client-stat-value">${formatCurrency(clientRevenue)}</div></div><div><div class="client-stat-label">Eff. Hourly</div><div class="client-stat-value">${formatCurrency(hourlyRate)}</div></div></div></div>`;
+                const effectiveHourly = clientHours > 0 ? clientRevenue / clientHours : 0;
+                const clientRate = cl.hourly_rate ? formatCurrency(cl.hourly_rate) : 'Not set';
+                return `<div class="client-card" onclick="viewClient('${cl.id}')"><div class="client-name">${escapeHtml(cl.name)}</div>${cl.hourly_rate ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Rate: ${clientRate}/hr</div>` : ''}<div class="client-stats"><div><div class="client-stat-label">Revenue</div><div class="client-stat-value">${formatCurrency(clientRevenue)}</div></div><div><div class="client-stat-label">Eff. Hourly</div><div class="client-stat-value">${formatCurrency(effectiveHourly)}</div></div></div></div>`;
             }).join('');
         }
 
@@ -720,13 +771,19 @@
 
         function renderMileage() {
             const totalMiles = mileageEntries.reduce((s, m) => s + parseFloat(m.miles), 0);
+            const alexMiles = mileageEntries.filter(m => m.driver === 'Alex').reduce((s, m) => s + parseFloat(m.miles), 0);
+            const tynaMiles = mileageEntries.filter(m => m.driver === 'Tyna').reduce((s, m) => s + parseFloat(m.miles), 0);
             document.getElementById('totalMiles').textContent = totalMiles.toFixed(1);
+            document.getElementById('alexMiles').textContent = alexMiles.toFixed(1);
+            document.getElementById('tynaMiles').textContent = tynaMiles.toFixed(1);
             document.getElementById('mileageDeduction').textContent = formatCurrency(totalMiles * 0.67);
+            document.getElementById('alexDeduction').textContent = formatCurrency(alexMiles * 0.67);
+            document.getElementById('tynaDeduction').textContent = formatCurrency(tynaMiles * 0.67);
             const c = document.getElementById('mileageList');
             if (!mileageEntries.length) { c.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg><p>No trips logged yet</p></div>'; return; }
             c.innerHTML = mileageEntries.map(m => {
                 const client = clients.find(cl => cl.id === m.client_id);
-                return `<div class="list-item" onclick="editMileage('${m.id}')"><div class="list-item-info"><div class="list-item-title">${escapeHtml(m.description)}</div><div class="list-item-meta"><span>${formatDate(m.date)}</span>${client ? `<span>• ${escapeHtml(client.name)}</span>` : ''}</div></div><div class="list-item-value">${parseFloat(m.miles).toFixed(1)} mi</div><div class="list-item-actions"><button class="action-btn delete" onclick="event.stopPropagation(); deleteMileage('${m.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div></div>`;
+                return `<div class="list-item" onclick="editMileage('${m.id}')"><div class="list-item-info"><div class="list-item-title">${escapeHtml(m.description)}</div><div class="list-item-meta"><span>${formatDate(m.date)}</span>${m.driver ? `<span>• ${escapeHtml(m.driver)}</span>` : ''}${client ? `<span>• ${escapeHtml(client.name)}</span>` : ''}</div></div><div class="list-item-value">${parseFloat(m.miles).toFixed(1)} mi</div><div class="list-item-actions"><button class="action-btn delete" onclick="event.stopPropagation(); deleteMileage('${m.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div></div>`;
             }).join('');
         }
 
@@ -757,7 +814,7 @@
         function openClientModal(id = null) {
             editingClientId = id;
             document.getElementById('clientModalTitle').textContent = id ? 'Edit Client' : 'Add Client';
-            if (id) { const cl = clients.find(x => x.id === id); if (cl) { document.getElementById('clientName').value = cl.name; document.getElementById('clientEmail').value = cl.email || ''; document.getElementById('clientPhone').value = cl.phone || ''; document.getElementById('clientNotes').value = cl.notes || ''; } }
+            if (id) { const cl = clients.find(x => x.id === id); if (cl) { document.getElementById('clientName').value = cl.name; document.getElementById('clientHourlyRate').value = cl.hourly_rate || ''; document.getElementById('clientEmail').value = cl.email || ''; document.getElementById('clientPhone').value = cl.phone || ''; document.getElementById('clientNotes').value = cl.notes || ''; } }
             else { document.getElementById('clientForm').reset(); }
             document.getElementById('clientModal').classList.add('active');
         }
@@ -765,7 +822,8 @@
         async function saveClient() {
             const form = document.getElementById('clientForm'); if (!form.checkValidity()) { form.reportValidity(); return; }
             const btn = document.getElementById('saveClientBtn'); btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>';
-            const data = { user_id: currentUser.id, name: document.getElementById('clientName').value, email: document.getElementById('clientEmail').value || null, phone: document.getElementById('clientPhone').value || null, notes: document.getElementById('clientNotes').value || null };
+            const hourlyRateValue = document.getElementById('clientHourlyRate').value;
+            const data = { user_id: currentUser.id, name: document.getElementById('clientName').value, hourly_rate: hourlyRateValue ? parseFloat(hourlyRateValue) : null, email: document.getElementById('clientEmail').value || null, phone: document.getElementById('clientPhone').value || null, notes: document.getElementById('clientNotes').value || null };
             let error; if (editingClientId) { const r = await supabase.from('as_clients').update(data).eq('id', editingClientId); error = r.error; } else { const r = await supabase.from('as_clients').insert([data]); error = r.error; }
             btn.disabled = false; btn.textContent = 'Save';
             if (error) { alert('Error saving client.'); console.error(error); return; }
@@ -785,13 +843,14 @@
             const expenses = clientTxns.filter(t => t.type === 'expense').reduce((s, t) => s + parseFloat(t.amount), 0);
             const hours = clientTime.reduce((s, te) => s + parseFloat(te.hours), 0);
             const miles = clientMileage.reduce((s, m) => s + parseFloat(m.miles), 0);
-            const hourlyRate = hours > 0 ? revenue / hours : 0;
+            const effectiveHourly = hours > 0 ? revenue / hours : 0;
             document.getElementById('clientDetailBody').innerHTML = `
+                ${cl.hourly_rate ? `<div style="background: var(--accent-olive-light); padding: 0.75rem 1rem; border-radius: var(--radius-sm); margin-bottom: 1rem;"><span style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted);">Client Rate</span><div style="font-family: 'DM Serif Display', serif; font-size: 1.25rem; color: var(--accent-olive);">${formatCurrency(cl.hourly_rate)}/hr</div></div>` : ''}
                 <div class="summary-grid" style="margin-bottom: 1rem;">
                     <div class="summary-card income"><div class="summary-label">Revenue</div><div class="summary-value">${formatCurrency(revenue)}</div></div>
                     <div class="summary-card expense"><div class="summary-label">Expenses</div><div class="summary-value">${formatCurrency(expenses)}</div></div>
                     <div class="summary-card"><div class="summary-label">Hours</div><div class="summary-value">${hours.toFixed(1)}</div></div>
-                    <div class="summary-card profit"><div class="summary-label">Eff. Hourly</div><div class="summary-value">${formatCurrency(hourlyRate)}</div></div>
+                    <div class="summary-card profit"><div class="summary-label">Eff. Hourly</div><div class="summary-value">${formatCurrency(effectiveHourly)}</div></div>
                 </div>
                 ${cl.email ? `<p style="font-size: 0.85rem; margin-bottom: 0.25rem;"><strong>Email:</strong> ${escapeHtml(cl.email)}</p>` : ''}
                 ${cl.phone ? `<p style="font-size: 0.85rem; margin-bottom: 0.25rem;"><strong>Phone:</strong> ${escapeHtml(cl.phone)}</p>` : ''}
@@ -831,7 +890,7 @@
         function openMileageModal(id = null) {
             editingMileageId = id;
             document.getElementById('mileageModalTitle').textContent = id ? 'Edit Trip' : 'Log Trip';
-            if (id) { const m = mileageEntries.find(x => x.id === id); if (m) { document.getElementById('mileageDate').value = m.date; document.getElementById('mileageMiles').value = m.miles; document.getElementById('mileageClient').value = m.client_id || ''; document.getElementById('mileageDescription').value = m.description; } }
+            if (id) { const m = mileageEntries.find(x => x.id === id); if (m) { document.getElementById('mileageDate').value = m.date; document.getElementById('mileageMiles').value = m.miles; document.getElementById('mileageDriver').value = m.driver || ''; document.getElementById('mileageClient').value = m.client_id || ''; document.getElementById('mileageDescription').value = m.description; } }
             else { document.getElementById('mileageForm').reset(); document.getElementById('mileageDate').value = new Date().toISOString().split('T')[0]; }
             document.getElementById('mileageModal').classList.add('active');
         }
@@ -840,7 +899,7 @@
         async function saveMileage() {
             const form = document.getElementById('mileageForm'); if (!form.checkValidity()) { form.reportValidity(); return; }
             const btn = document.getElementById('saveMileageBtn'); btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>';
-            const data = { user_id: currentUser.id, date: document.getElementById('mileageDate').value, miles: parseFloat(document.getElementById('mileageMiles').value), client_id: document.getElementById('mileageClient').value || null, description: document.getElementById('mileageDescription').value };
+            const data = { user_id: currentUser.id, date: document.getElementById('mileageDate').value, miles: parseFloat(document.getElementById('mileageMiles').value), driver: document.getElementById('mileageDriver').value, client_id: document.getElementById('mileageClient').value || null, description: document.getElementById('mileageDescription').value };
             let error; if (editingMileageId) { const r = await supabase.from('as_mileage').update(data).eq('id', editingMileageId); error = r.error; } else { const r = await supabase.from('as_mileage').insert([data]); error = r.error; }
             btn.disabled = false; btn.textContent = 'Save';
             if (error) { alert('Error saving trip.'); console.error(error); return; }
@@ -848,16 +907,34 @@
         }
         async function deleteMileage(id) { if (!confirm('Delete this trip?')) return; await supabase.from('as_mileage').delete().eq('id', id); await loadAllData(); }
 
+        // Mileage Deduction Calculator
+        function calculateDeduction() {
+            const miles = parseFloat(document.getElementById('calcMiles').value) || 0;
+            const rate = parseFloat(document.getElementById('calcRate').value) || 67;
+            const deduction = miles * (rate / 100);
+            document.getElementById('calcResult').textContent = formatCurrency(deduction);
+        }
+        function useTrackedMiles(driver) {
+            let miles = 0;
+            if (driver === 'all') {
+                miles = mileageEntries.reduce((s, m) => s + parseFloat(m.miles), 0);
+            } else {
+                miles = mileageEntries.filter(m => m.driver === driver).reduce((s, m) => s + parseFloat(m.miles), 0);
+            }
+            document.getElementById('calcMiles').value = miles.toFixed(1);
+            calculateDeduction();
+        }
+
         // Export
         function exportCSV() {
             let csv = 'TRANSACTIONS\nDate,Type,Category,Client,Description,Amount,Notes\n';
             transactions.forEach(t => { const cl = clients.find(c => c.id === t.client_id); csv += `${t.date},${t.type},${t.category},"${cl ? cl.name : ''}","${t.description.replace(/"/g, '""')}",${t.amount},"${(t.notes || '').replace(/"/g, '""')}"\n`; });
-            csv += '\nCLIENTS\nName,Email,Phone,Notes\n';
-            clients.forEach(c => { csv += `"${c.name.replace(/"/g, '""')}","${c.email || ''}","${c.phone || ''}","${(c.notes || '').replace(/"/g, '""')}"\n`; });
+            csv += '\nCLIENTS\nName,Hourly Rate,Email,Phone,Notes\n';
+            clients.forEach(c => { csv += `"${c.name.replace(/"/g, '""')}",${c.hourly_rate || ''},"${c.email || ''}","${c.phone || ''}","${(c.notes || '').replace(/"/g, '""')}"\n`; });
             csv += '\nTIME ENTRIES\nDate,Client,Hours,Description\n';
             timeEntries.forEach(te => { const cl = clients.find(c => c.id === te.client_id); csv += `${te.date},"${cl ? cl.name : ''}",${te.hours},"${te.description.replace(/"/g, '""')}"\n`; });
-            csv += '\nMILEAGE\nDate,Client,Miles,Description\n';
-            mileageEntries.forEach(m => { const cl = clients.find(c => c.id === m.client_id); csv += `${m.date},"${cl ? cl.name : ''}",${m.miles},"${m.description.replace(/"/g, '""')}"\n`; });
+            csv += '\nMILEAGE\nDate,Driver,Client,Miles,Description\n';
+            mileageEntries.forEach(m => { const cl = clients.find(c => c.id === m.client_id); csv += `${m.date},"${m.driver || ''}","${cl ? cl.name : ''}",${m.miles},"${m.description.replace(/"/g, '""')}"\n`; });
             const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `aesthetic_state_${new Date().toISOString().split('T')[0]}.csv`; a.click();
             localStorage.setItem('lastExport', new Date().toISOString()); updateBackupReminder();
         }
