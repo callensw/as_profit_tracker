@@ -200,6 +200,13 @@
         .payout-type-badge { font-size: 0.55rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.2rem 0.5rem; border-radius: 2px; margin-left: 0.5rem; }
         .payout-type-badge.payout { background: var(--income-sage-light); color: var(--income-sage); }
         .payout-type-badge.withholding { background: var(--expense-clay-light); color: var(--expense-clay); }
+
+        /* Paid/Unpaid status badges */
+        .paid-badge { font-size: 0.55rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.2rem 0.5rem; border-radius: 2px; cursor: pointer; transition: all 0.15s ease; }
+        .paid-badge.paid { background: var(--income-sage-light); color: var(--income-sage); }
+        .paid-badge.unpaid { background: #FEF3C7; color: #B45309; }
+        .paid-badge:hover { opacity: 0.8; }
+        .list-item.unpaid { border-left: 3px solid #F59E0B; }
     </style>
 </head>
 <body>
@@ -296,10 +303,10 @@
                         <div class="summary-label">Net Profit</div>
                         <div class="summary-value" id="netProfit">$0</div>
                     </div>
-                    <div class="summary-card">
-                        <div class="summary-label">Expense Ratio</div>
-                        <div class="summary-value" id="expenseRatio">0%</div>
-                        <div class="summary-sub">Lower is better</div>
+                    <div class="summary-card" style="border-top: 3px solid #F59E0B;">
+                        <div class="summary-label">Outstanding</div>
+                        <div class="summary-value" id="totalOutstanding" style="color: #B45309;">$0</div>
+                        <div class="summary-sub">Unpaid income</div>
                     </div>
                 </div>
                 <div style="margin-bottom: 1rem;">
@@ -526,6 +533,13 @@
                     <div class="form-group">
                         <label class="form-label" for="txnNotes">Notes (optional)</label>
                         <textarea class="form-textarea" id="txnNotes" rows="2" placeholder="Any additional details..."></textarea>
+                    </div>
+                    <div class="form-group" id="txnPaidGroup" style="display: none;">
+                        <label class="form-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="txnPaid" style="width: 16px; height: 16px; cursor: pointer;">
+                            Payment Received
+                        </label>
+                        <input type="date" class="form-input" id="txnPaidDate" style="margin-top: 0.5rem; display: none;" placeholder="Payment date">
                     </div>
                 </form>
             </div>
@@ -790,7 +804,21 @@
 
         function setupEventListeners() {
             // Type toggle
-            document.querySelectorAll('.type-btn').forEach(btn => btn.addEventListener('click', () => { document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); currentType = btn.dataset.type; updateCategoryOptions(); }));
+            document.querySelectorAll('.type-btn').forEach(btn => btn.addEventListener('click', () => {
+                document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentType = btn.dataset.type;
+                updateCategoryOptions();
+                // Show paid option only for income
+                document.getElementById('txnPaidGroup').style.display = currentType === 'income' ? 'block' : 'none';
+            }));
+            // Paid checkbox toggle - show/hide date field
+            document.getElementById('txnPaid').addEventListener('change', (e) => {
+                document.getElementById('txnPaidDate').style.display = e.target.checked ? 'block' : 'none';
+                if (e.target.checked && !document.getElementById('txnPaidDate').value) {
+                    document.getElementById('txnPaidDate').value = new Date().toISOString().split('T')[0];
+                }
+            });
             // Date filter (both dashboard and payouts)
             document.querySelectorAll('.filter-btn').forEach(btn => btn.addEventListener('click', () => {
                 document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -872,10 +900,10 @@
             const filteredTxns = filterTransactions();
             const filteredPayouts = filterPayouts();
 
-            // Calculate net profit from transactions
-            const totalIncome = filteredTxns.filter(t => t.type === 'income').reduce((s, t) => s + parseFloat(t.amount), 0);
+            // Calculate net profit from transactions (only count PAID income for splitting)
+            const paidIncome = filteredTxns.filter(t => t.type === 'income' && t.paid).reduce((s, t) => s + parseFloat(t.amount), 0);
             const totalExpenses = filteredTxns.filter(t => t.type === 'expense').reduce((s, t) => s + parseFloat(t.amount), 0);
-            const netProfit = totalIncome - totalExpenses;
+            const netProfit = paidIncome - totalExpenses;
 
             // Calculate totals by type and owner
             const alexPayouts = filteredPayouts.filter(p => p.type === 'payout' && p.owner === 'Alex').reduce((s, p) => s + parseFloat(p.amount), 0);
@@ -909,10 +937,11 @@
             const f = filterTransactions();
             const inc = f.filter(t => t.type === 'income').reduce((s, t) => s + parseFloat(t.amount), 0);
             const exp = f.filter(t => t.type === 'expense').reduce((s, t) => s + parseFloat(t.amount), 0);
+            const outstanding = f.filter(t => t.type === 'income' && !t.paid).reduce((s, t) => s + parseFloat(t.amount), 0);
             const expenseRatio = inc > 0 ? Math.round((exp / inc) * 100) : 0;
             document.getElementById('totalIncome').textContent = formatCurrency(inc);
             document.getElementById('totalExpenses').textContent = formatCurrency(exp);
-            document.getElementById('expenseRatio').textContent = expenseRatio + '%';
+            document.getElementById('totalOutstanding').textContent = formatCurrency(outstanding);
             const pe = document.getElementById('netProfit'); pe.textContent = formatCurrency(inc - exp); pe.className = 'summary-value ' + (inc - exp >= 0 ? 'positive' : 'negative');
             renderTransactionList();
             renderPnL();
@@ -936,7 +965,9 @@
                     titleText = client ? escapeHtml(client.name) : escapeHtml(t.description);
                     metaDesc = client ? t.description : null;
                 }
-                return `<div class="list-item" onclick="editTransaction('${t.id}')"><div class="list-item-info"><div class="list-item-title">${titleText}</div><div class="list-item-meta"><span>${formatDate(t.date)}</span><span>${escapeHtml(t.category)}</span>${metaDesc ? `<span>• ${escapeHtml(metaDesc)}</span>` : ''}</div></div><div class="list-item-value ${t.type}">${t.type === 'expense' ? '-' : '+'}${formatCurrency(parseFloat(t.amount))}</div><div class="list-item-actions"><button class="action-btn delete" onclick="event.stopPropagation(); deleteTransaction('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div></div>`;
+                const isUnpaid = t.type === 'income' && !t.paid;
+                const paidBadge = t.type === 'income' ? `<span class="paid-badge ${t.paid ? 'paid' : 'unpaid'}" onclick="event.stopPropagation(); togglePaid('${t.id}')">${t.paid ? 'Paid' : 'Unpaid'}</span>` : '';
+                return `<div class="list-item${isUnpaid ? ' unpaid' : ''}" onclick="editTransaction('${t.id}')"><div class="list-item-info"><div class="list-item-title">${titleText} ${paidBadge}</div><div class="list-item-meta"><span>${formatDate(t.date)}</span><span>${escapeHtml(t.category)}</span>${metaDesc ? `<span>• ${escapeHtml(metaDesc)}</span>` : ''}</div></div><div class="list-item-value ${t.type}">${t.type === 'expense' ? '-' : '+'}${formatCurrency(parseFloat(t.amount))}</div><div class="list-item-actions"><button class="action-btn delete" onclick="event.stopPropagation(); deleteTransaction('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div></div>`;
             }).join('');
         }
 
@@ -1007,8 +1038,34 @@
             document.getElementById('transactionModalTitle').textContent = id ? 'Edit Transaction' : 'Add Transaction';
             if (id) {
                 const t = transactions.find(x => x.id === id);
-                if (t) { document.getElementById('txnDate').value = t.date; document.getElementById('txnAmount').value = t.amount; document.getElementById('txnDescription').value = t.description; document.getElementById('txnNotes').value = t.notes || ''; document.getElementById('txnClient').value = t.client_id || ''; currentType = t.type; document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === t.type)); updateCategoryOptions(); document.getElementById('txnCategory').value = t.category; }
-            } else { document.getElementById('transactionForm').reset(); document.getElementById('txnDate').value = new Date().toISOString().split('T')[0]; currentType = 'income'; document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'income')); updateCategoryOptions(); }
+                if (t) {
+                    document.getElementById('txnDate').value = t.date;
+                    document.getElementById('txnAmount').value = t.amount;
+                    document.getElementById('txnDescription').value = t.description;
+                    document.getElementById('txnNotes').value = t.notes || '';
+                    document.getElementById('txnClient').value = t.client_id || '';
+                    currentType = t.type;
+                    document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === t.type));
+                    updateCategoryOptions();
+                    document.getElementById('txnCategory').value = t.category;
+                    // Handle paid status
+                    document.getElementById('txnPaidGroup').style.display = t.type === 'income' ? 'block' : 'none';
+                    document.getElementById('txnPaid').checked = t.paid || false;
+                    document.getElementById('txnPaidDate').style.display = t.paid ? 'block' : 'none';
+                    document.getElementById('txnPaidDate').value = t.paid_date || '';
+                }
+            } else {
+                document.getElementById('transactionForm').reset();
+                document.getElementById('txnDate').value = new Date().toISOString().split('T')[0];
+                currentType = 'income';
+                document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'income'));
+                updateCategoryOptions();
+                // Default for new income: unpaid
+                document.getElementById('txnPaidGroup').style.display = 'block';
+                document.getElementById('txnPaid').checked = false;
+                document.getElementById('txnPaidDate').style.display = 'none';
+                document.getElementById('txnPaidDate').value = '';
+            }
             document.getElementById('transactionModal').classList.add('active');
         }
         function closeTransactionModal() { document.getElementById('transactionModal').classList.remove('active'); editingTxnId = null; }
@@ -1016,13 +1073,36 @@
         async function saveTransaction() {
             const form = document.getElementById('transactionForm'); if (!form.checkValidity()) { form.reportValidity(); return; }
             const btn = document.getElementById('saveTxnBtn'); btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>';
-            const data = { user_id: currentUser.id, type: currentType, date: document.getElementById('txnDate').value, amount: parseFloat(document.getElementById('txnAmount').value), category: document.getElementById('txnCategory').value, description: document.getElementById('txnDescription').value, notes: document.getElementById('txnNotes').value || null, client_id: document.getElementById('txnClient').value || null };
+            const isPaid = currentType === 'income' ? document.getElementById('txnPaid').checked : true;
+            const paidDate = isPaid && document.getElementById('txnPaidDate').value ? document.getElementById('txnPaidDate').value : null;
+            const data = {
+                user_id: currentUser.id,
+                type: currentType,
+                date: document.getElementById('txnDate').value,
+                amount: parseFloat(document.getElementById('txnAmount').value),
+                category: document.getElementById('txnCategory').value,
+                description: document.getElementById('txnDescription').value,
+                notes: document.getElementById('txnNotes').value || null,
+                client_id: document.getElementById('txnClient').value || null,
+                paid: isPaid,
+                paid_date: paidDate
+            };
             let error; if (editingTxnId) { const r = await supabase.from('as_transactions').update(data).eq('id', editingTxnId); error = r.error; } else { const r = await supabase.from('as_transactions').insert([data]); error = r.error; }
             btn.disabled = false; btn.textContent = 'Save';
             if (error) { alert('Error saving transaction.'); console.error(error); return; }
             await loadAllData(); closeTransactionModal();
         }
         async function deleteTransaction(id) { if (!confirm('Delete this transaction?')) return; await supabase.from('as_transactions').delete().eq('id', id); await loadAllData(); }
+
+        async function togglePaid(id) {
+            const t = transactions.find(x => x.id === id);
+            if (!t || t.type !== 'income') return;
+            const newPaid = !t.paid;
+            const paidDate = newPaid ? new Date().toISOString().split('T')[0] : null;
+            const { error } = await supabase.from('as_transactions').update({ paid: newPaid, paid_date: paidDate }).eq('id', id);
+            if (error) { alert('Error updating payment status.'); console.error(error); return; }
+            await loadAllData();
+        }
 
         // Client Modal
         function openClientModal(id = null) {
@@ -1084,11 +1164,13 @@
             const clientMileage = mileageEntries.filter(m => m.client_id === id);
             const revenue = clientTxns.filter(t => t.type === 'income').reduce((s, t) => s + parseFloat(t.amount), 0);
             const expenses = clientTxns.filter(t => t.type === 'expense').reduce((s, t) => s + parseFloat(t.amount), 0);
+            const outstanding = clientTxns.filter(t => t.type === 'income' && !t.paid).reduce((s, t) => s + parseFloat(t.amount), 0);
             const hours = clientTime.reduce((s, te) => s + parseFloat(te.hours), 0);
             const miles = clientMileage.reduce((s, m) => s + parseFloat(m.miles), 0);
             const effectiveHourly = hours > 0 ? revenue / hours : 0;
             document.getElementById('clientDetailBody').innerHTML = `
                 ${cl.hourly_rate ? `<div style="background: var(--accent-olive-light); padding: 0.75rem 1rem; border-radius: var(--radius-sm); margin-bottom: 1rem;"><span style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted);">Client Rate</span><div style="font-family: 'DM Serif Display', serif; font-size: 1.25rem; color: var(--accent-olive);">${formatCurrency(cl.hourly_rate)}/hr</div></div>` : ''}
+                ${outstanding > 0 ? `<div style="background: #FEF3C7; padding: 0.75rem 1rem; border-radius: var(--radius-sm); margin-bottom: 1rem;"><span style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: #92400E;">Outstanding Balance</span><div style="font-family: 'DM Serif Display', serif; font-size: 1.25rem; color: #B45309;">${formatCurrency(outstanding)}</div></div>` : ''}
                 <div class="summary-grid" style="margin-bottom: 1rem;">
                     <div class="summary-card income"><div class="summary-label">Revenue</div><div class="summary-value">${formatCurrency(revenue)}</div></div>
                     <div class="summary-card expense"><div class="summary-label">Expenses</div><div class="summary-value">${formatCurrency(expenses)}</div></div>
@@ -1158,7 +1240,9 @@
                         category: 'Invoice',
                         description: `${hours}h - ${description}`,
                         notes: `Auto-generated from time entry`,
-                        client_id: clientId
+                        client_id: clientId,
+                        paid: false,
+                        paid_date: null
                     };
                     const incomeResult = await supabase.from('as_transactions').insert([incomeData]);
                     if (incomeResult.error) {
@@ -1380,8 +1464,8 @@
 
         // Export
         function exportCSV() {
-            let csv = 'TRANSACTIONS\nDate,Type,Category,Client,Description,Amount,Notes\n';
-            transactions.forEach(t => { const cl = clients.find(c => c.id === t.client_id); csv += `${t.date},${t.type},${t.category},"${cl ? cl.name : ''}","${t.description.replace(/"/g, '""')}",${t.amount},"${(t.notes || '').replace(/"/g, '""')}"\n`; });
+            let csv = 'TRANSACTIONS\nDate,Type,Category,Client,Description,Amount,Paid,Paid Date,Notes\n';
+            transactions.forEach(t => { const cl = clients.find(c => c.id === t.client_id); csv += `${t.date},${t.type},${t.category},"${cl ? cl.name : ''}","${t.description.replace(/"/g, '""')}",${t.amount},${t.paid ? 'Yes' : 'No'},${t.paid_date || ''},"${(t.notes || '').replace(/"/g, '""')}"\n`; });
             csv += '\nCLIENTS\nName,Hourly Rate,Email,Phone,Address,Notes\n';
             clients.forEach(c => { csv += `"${c.name.replace(/"/g, '""')}",${c.hourly_rate || ''},"${c.email || ''}","${c.phone || ''}","${(c.address || '').replace(/"/g, '""')}","${(c.notes || '').replace(/"/g, '""')}"\n`; });
             csv += '\nTIME ENTRIES\nDate,Client,Hours,Description\n';
