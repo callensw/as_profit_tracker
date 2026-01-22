@@ -432,13 +432,23 @@
                         <div class="summary-label">Available to Split</div>
                         <div class="summary-value" id="payoutAvailable">$0</div>
                     </div>
-                    <div class="summary-card expense">
-                        <div class="summary-label">Total Paid Out</div>
-                        <div class="summary-value" id="payoutTotalPaid">$0</div>
-                    </div>
                     <div class="summary-card">
                         <div class="summary-label">Withheld in Business</div>
                         <div class="summary-value" id="payoutWithheld">$0</div>
+                    </div>
+                </div>
+                <div class="summary-grid" style="margin-bottom: 1.5rem;">
+                    <div class="summary-card expense">
+                        <div class="summary-label">Alex Total Paid</div>
+                        <div class="summary-value" id="payoutAlexTotal">$0</div>
+                    </div>
+                    <div class="summary-card expense">
+                        <div class="summary-label">Tyna Total Paid</div>
+                        <div class="summary-value" id="payoutTynaTotal">$0</div>
+                    </div>
+                    <div class="summary-card expense">
+                        <div class="summary-label">Combined Paid Out</div>
+                        <div class="summary-value" id="payoutTotalPaid">$0</div>
                     </div>
                 </div>
 
@@ -1191,8 +1201,10 @@
             document.getElementById('payoutNetProfit').textContent = formatCurrency(split.netProfit);
             document.getElementById('payoutNetProfit').className = 'summary-value ' + (split.netProfit >= 0 ? 'positive' : 'negative');
             document.getElementById('payoutAvailable').textContent = formatCurrency(split.availableToSplit);
-            document.getElementById('payoutTotalPaid').textContent = formatCurrency(split.totalPaidOut);
             document.getElementById('payoutWithheld').textContent = formatCurrency(split.totalWithheld);
+            document.getElementById('payoutAlexTotal').textContent = formatCurrency(split.alex.paidOut);
+            document.getElementById('payoutTynaTotal').textContent = formatCurrency(split.tyna.paidOut);
+            document.getElementById('payoutTotalPaid').textContent = formatCurrency(split.totalPaidOut);
 
             // Update owner cards
             const alexAvail = document.getElementById('alexAvailable');
