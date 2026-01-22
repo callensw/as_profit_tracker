@@ -476,6 +476,10 @@
                         <input type="tel" class="form-input" id="clientPhone" placeholder="(555) 123-4567">
                     </div>
                     <div class="form-group">
+                        <label class="form-label" for="clientAddress">Address (optional)</label>
+                        <textarea class="form-textarea" id="clientAddress" rows="2" placeholder="123 Main St, City, State ZIP"></textarea>
+                    </div>
+                    <div class="form-group">
                         <label class="form-label" for="clientNotes">Notes (optional)</label>
                         <textarea class="form-textarea" id="clientNotes" rows="2" placeholder="Project details, preferences, etc."></textarea>
                     </div>
@@ -814,7 +818,17 @@
         function openClientModal(id = null) {
             editingClientId = id;
             document.getElementById('clientModalTitle').textContent = id ? 'Edit Client' : 'Add Client';
-            if (id) { const cl = clients.find(x => x.id === id); if (cl) { document.getElementById('clientName').value = cl.name; document.getElementById('clientHourlyRate').value = cl.hourly_rate || ''; document.getElementById('clientEmail').value = cl.email || ''; document.getElementById('clientPhone').value = cl.phone || ''; document.getElementById('clientNotes').value = cl.notes || ''; } }
+            if (id) {
+                const cl = clients.find(x => x.id === id);
+                if (cl) {
+                    document.getElementById('clientName').value = cl.name;
+                    document.getElementById('clientHourlyRate').value = cl.hourly_rate || '';
+                    document.getElementById('clientEmail').value = cl.email || '';
+                    document.getElementById('clientPhone').value = cl.phone || '';
+                    document.getElementById('clientAddress').value = cl.address || '';
+                    document.getElementById('clientNotes').value = cl.notes || '';
+                }
+            }
             else { document.getElementById('clientForm').reset(); }
             document.getElementById('clientModal').classList.add('active');
         }
@@ -822,11 +836,30 @@
         async function saveClient() {
             const form = document.getElementById('clientForm'); if (!form.checkValidity()) { form.reportValidity(); return; }
             const btn = document.getElementById('saveClientBtn'); btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>';
-            const hourlyRateValue = document.getElementById('clientHourlyRate').value;
-            const data = { user_id: currentUser.id, name: document.getElementById('clientName').value, hourly_rate: hourlyRateValue ? parseFloat(hourlyRateValue) : null, email: document.getElementById('clientEmail').value || null, phone: document.getElementById('clientPhone').value || null, notes: document.getElementById('clientNotes').value || null };
-            let error; if (editingClientId) { const r = await supabase.from('as_clients').update(data).eq('id', editingClientId); error = r.error; } else { const r = await supabase.from('as_clients').insert([data]); error = r.error; }
+            const hourlyRateValue = document.getElementById('clientHourlyRate').value.trim();
+            const data = {
+                user_id: currentUser.id,
+                name: document.getElementById('clientName').value.trim(),
+                hourly_rate: hourlyRateValue ? parseFloat(hourlyRateValue) : null,
+                email: document.getElementById('clientEmail').value.trim() || null,
+                phone: document.getElementById('clientPhone').value.trim() || null,
+                address: document.getElementById('clientAddress').value.trim() || null,
+                notes: document.getElementById('clientNotes').value.trim() || null
+            };
+            let error, result;
+            if (editingClientId) {
+                result = await supabase.from('as_clients').update(data).eq('id', editingClientId);
+                error = result.error;
+            } else {
+                result = await supabase.from('as_clients').insert([data]);
+                error = result.error;
+            }
             btn.disabled = false; btn.textContent = 'Save';
-            if (error) { alert('Error saving client.'); console.error(error); return; }
+            if (error) {
+                console.error('Client save error:', error);
+                alert('Error saving client: ' + (error.message || 'Unknown error. Check console for details.'));
+                return;
+            }
             await loadAllData(); closeClientModal(); closeClientDetailModal();
         }
 
@@ -854,6 +887,7 @@
                 </div>
                 ${cl.email ? `<p style="font-size: 0.85rem; margin-bottom: 0.25rem;"><strong>Email:</strong> ${escapeHtml(cl.email)}</p>` : ''}
                 ${cl.phone ? `<p style="font-size: 0.85rem; margin-bottom: 0.25rem;"><strong>Phone:</strong> ${escapeHtml(cl.phone)}</p>` : ''}
+                ${cl.address ? `<p style="font-size: 0.85rem; margin-bottom: 0.25rem;"><strong>Address:</strong> ${escapeHtml(cl.address)}</p>` : ''}
                 ${cl.notes ? `<p style="font-size: 0.85rem; margin-bottom: 0.25rem;"><strong>Notes:</strong> ${escapeHtml(cl.notes)}</p>` : ''}
                 <div style="margin-top: 1rem;"><h4 style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem;">Recent Transactions</h4>
                 ${clientTxns.slice(0, 5).map(t => `<div style="font-size: 0.8rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between;"><span>${formatDate(t.date)} - ${escapeHtml(t.description)}</span><span class="${t.type === 'income' ? 'pnl-amount income' : 'pnl-amount expense'}">${t.type === 'expense' ? '-' : ''}${formatCurrency(parseFloat(t.amount))}</span></div>`).join('') || '<p style="font-size: 0.8rem; color: var(--text-muted);">No transactions</p>'}
@@ -878,10 +912,53 @@
         async function saveTimeEntry() {
             const form = document.getElementById('timeForm'); if (!form.checkValidity()) { form.reportValidity(); return; }
             const btn = document.getElementById('saveTimeBtn'); btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>';
-            const data = { user_id: currentUser.id, date: document.getElementById('timeDate').value, hours: parseFloat(document.getElementById('timeHours').value), client_id: document.getElementById('timeClient').value || null, description: document.getElementById('timeDescription').value };
-            let error; if (editingTimeId) { const r = await supabase.from('as_time_entries').update(data).eq('id', editingTimeId); error = r.error; } else { const r = await supabase.from('as_time_entries').insert([data]); error = r.error; }
+            const hours = parseFloat(document.getElementById('timeHours').value);
+            const clientId = document.getElementById('timeClient').value || null;
+            const date = document.getElementById('timeDate').value;
+            const description = document.getElementById('timeDescription').value;
+            const data = { user_id: currentUser.id, date, hours, client_id: clientId, description };
+
+            let error;
+            const isNewEntry = !editingTimeId;
+
+            if (editingTimeId) {
+                const r = await supabase.from('as_time_entries').update(data).eq('id', editingTimeId);
+                error = r.error;
+            } else {
+                const r = await supabase.from('as_time_entries').insert([data]);
+                error = r.error;
+            }
+
+            if (error) {
+                btn.disabled = false; btn.textContent = 'Save';
+                alert('Error saving time entry.'); console.error(error);
+                return;
+            }
+
+            // Auto-create income transaction for new time entries if client has hourly rate
+            if (isNewEntry && clientId) {
+                const client = clients.find(c => c.id === clientId);
+                if (client && client.hourly_rate) {
+                    const incomeAmount = hours * client.hourly_rate;
+                    const incomeData = {
+                        user_id: currentUser.id,
+                        type: 'income',
+                        date: date,
+                        amount: incomeAmount,
+                        category: 'Invoice',
+                        description: `${hours}h - ${description}`,
+                        notes: `Auto-generated from time entry`,
+                        client_id: clientId
+                    };
+                    const incomeResult = await supabase.from('as_transactions').insert([incomeData]);
+                    if (incomeResult.error) {
+                        console.error('Error creating income from time entry:', incomeResult.error);
+                        // Don't block - time entry was saved, just log the error
+                    }
+                }
+            }
+
             btn.disabled = false; btn.textContent = 'Save';
-            if (error) { alert('Error saving time entry.'); console.error(error); return; }
             await loadAllData(); closeTimeModal();
         }
         async function deleteTimeEntry(id) { if (!confirm('Delete this time entry?')) return; await supabase.from('as_time_entries').delete().eq('id', id); await loadAllData(); }
@@ -929,8 +1006,8 @@
         function exportCSV() {
             let csv = 'TRANSACTIONS\nDate,Type,Category,Client,Description,Amount,Notes\n';
             transactions.forEach(t => { const cl = clients.find(c => c.id === t.client_id); csv += `${t.date},${t.type},${t.category},"${cl ? cl.name : ''}","${t.description.replace(/"/g, '""')}",${t.amount},"${(t.notes || '').replace(/"/g, '""')}"\n`; });
-            csv += '\nCLIENTS\nName,Hourly Rate,Email,Phone,Notes\n';
-            clients.forEach(c => { csv += `"${c.name.replace(/"/g, '""')}",${c.hourly_rate || ''},"${c.email || ''}","${c.phone || ''}","${(c.notes || '').replace(/"/g, '""')}"\n`; });
+            csv += '\nCLIENTS\nName,Hourly Rate,Email,Phone,Address,Notes\n';
+            clients.forEach(c => { csv += `"${c.name.replace(/"/g, '""')}",${c.hourly_rate || ''},"${c.email || ''}","${c.phone || ''}","${(c.address || '').replace(/"/g, '""')}","${(c.notes || '').replace(/"/g, '""')}"\n`; });
             csv += '\nTIME ENTRIES\nDate,Client,Hours,Description\n';
             timeEntries.forEach(te => { const cl = clients.find(c => c.id === te.client_id); csv += `${te.date},"${cl ? cl.name : ''}",${te.hours},"${te.description.replace(/"/g, '""')}"\n`; });
             csv += '\nMILEAGE\nDate,Driver,Client,Miles,Description\n';
