@@ -1188,7 +1188,7 @@
             document.getElementById('clientDetailModal').classList.add('active');
         }
         function closeClientDetailModal() { document.getElementById('clientDetailModal').classList.remove('active'); viewingClientId = null; }
-        function editClientFromDetail() { closeClientDetailModal(); openClientModal(viewingClientId); }
+        function editClientFromDetail() { const id = viewingClientId; closeClientDetailModal(); openClientModal(id); }
         async function deleteClientFromDetail() { if (!confirm('Delete this client? Their transactions will remain but be unlinked.')) return; await supabase.from('as_clients').delete().eq('id', viewingClientId); closeClientDetailModal(); await loadAllData(); }
 
         // Time Modal
