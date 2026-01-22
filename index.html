@@ -866,18 +866,25 @@
             const totalWithheld = filteredPayouts.filter(p => p.type === 'withholding').reduce((s, p) => s + parseFloat(p.amount), 0);
 
             const totalPaidOut = alexPayouts + tynaPayouts;
-            const availableToSplit = netProfit - totalPaidOut - totalWithheld;
 
-            // 50/50 split
-            const perOwnerShare = availableToSplit / 2;
+            // Each owner's base share is 50% of (profit minus withholdings)
+            const profitAfterWithholding = netProfit - totalWithheld;
+            const baseShare = profitAfterWithholding / 2;
+
+            // Each owner's available = their base share minus what they've already taken
+            const alexAvailable = baseShare - alexPayouts;
+            const tynaAvailable = baseShare - tynaPayouts;
+
+            // Total still available to split
+            const availableToSplit = alexAvailable + tynaAvailable;
 
             return {
                 netProfit,
                 totalPaidOut,
                 totalWithheld,
                 availableToSplit,
-                alex: { paidOut: alexPayouts, available: perOwnerShare },
-                tyna: { paidOut: tynaPayouts, available: perOwnerShare }
+                alex: { paidOut: alexPayouts, available: alexAvailable },
+                tyna: { paidOut: tynaPayouts, available: tynaAvailable }
             };
         }
 
