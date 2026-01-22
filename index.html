@@ -183,6 +183,23 @@
         ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
         .backup-reminder { font-size: 0.6rem; padding: 0.3rem 0.6rem; background: rgba(156, 123, 107, 0.2); color: #FFFFFF; border-radius: 2px; cursor: pointer; display: none; letter-spacing: 0.05em; }
+
+        /* Payouts Tab - Owner Cards */
+        .owner-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+        @media (max-width: 700px) { .owner-grid { grid-template-columns: 1fr; } }
+        .owner-card { background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border); padding: 1.5rem; }
+        .owner-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+        .owner-name { font-family: 'DM Serif Display', serif; font-size: 1.1rem; }
+        .owner-share-badge { font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); background: var(--bg-accent); padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); }
+        .owner-stat-row { display: flex; justify-content: space-between; padding: 0.4rem 0; font-size: 0.85rem; }
+        .owner-stat-row span:first-child { color: var(--text-muted); }
+        .owner-available { font-family: 'DM Serif Display', serif; font-size: 1.75rem; color: var(--income-sage); margin: 1rem 0; }
+        .owner-available.negative { color: var(--expense-clay); }
+
+        /* Payout list badges */
+        .payout-type-badge { font-size: 0.55rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.2rem 0.5rem; border-radius: 2px; margin-left: 0.5rem; }
+        .payout-type-badge.payout { background: var(--income-sage-light); color: var(--income-sage); }
+        .payout-type-badge.withholding { background: var(--expense-clay-light); color: var(--expense-clay); }
     </style>
 </head>
 <body>
@@ -254,6 +271,7 @@
                 <button class="tab" data-tab="clients">Clients</button>
                 <button class="tab" data-tab="time">Time</button>
                 <button class="tab" data-tab="mileage">Mileage</button>
+                <button class="tab" data-tab="payouts">Payouts</button>
             </div>
 
             <!-- Dashboard Tab -->
@@ -393,6 +411,65 @@
                 <div class="card">
                     <div class="card-header"><h2 class="card-title">Trips</h2></div>
                     <div class="list" id="mileageList"></div>
+                </div>
+            </div>
+
+            <!-- Payouts Tab -->
+            <div class="tab-content" id="payoutsTab">
+                <div class="date-filter" id="payoutsDateFilter">
+                    <button class="filter-btn active" data-filter="all">All Time</button>
+                    <button class="filter-btn" data-filter="month">This Month</button>
+                    <button class="filter-btn" data-filter="lastMonth">Last Month</button>
+                    <button class="filter-btn" data-filter="quarter">This Quarter</button>
+                    <button class="filter-btn" data-filter="year">This Year</button>
+                </div>
+                <div class="summary-grid">
+                    <div class="summary-card profit">
+                        <div class="summary-label">Net Profit</div>
+                        <div class="summary-value" id="payoutNetProfit">$0</div>
+                    </div>
+                    <div class="summary-card income">
+                        <div class="summary-label">Available to Split</div>
+                        <div class="summary-value" id="payoutAvailable">$0</div>
+                    </div>
+                    <div class="summary-card expense">
+                        <div class="summary-label">Total Paid Out</div>
+                        <div class="summary-value" id="payoutTotalPaid">$0</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-label">Withheld in Business</div>
+                        <div class="summary-value" id="payoutWithheld">$0</div>
+                    </div>
+                </div>
+
+                <div class="owner-grid">
+                    <div class="owner-card" id="alexCard">
+                        <div class="owner-card-header">
+                            <span class="owner-name">Alex</span>
+                            <span class="owner-share-badge">50% Share</span>
+                        </div>
+                        <div class="owner-available" id="alexAvailable">$0</div>
+                        <div class="owner-stat-row"><span>Paid Out</span><span id="alexPaidOut">$0</span></div>
+                        <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="openPayoutModal('payout', 'Alex')">Record Payout</button>
+                    </div>
+                    <div class="owner-card" id="tynaCard">
+                        <div class="owner-card-header">
+                            <span class="owner-name">Tyna</span>
+                            <span class="owner-share-badge">50% Share</span>
+                        </div>
+                        <div class="owner-available" id="tynaAvailable">$0</div>
+                        <div class="owner-stat-row"><span>Paid Out</span><span id="tynaPaidOut">$0</span></div>
+                        <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="openPayoutModal('payout', 'Tyna')">Record Payout</button>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 1rem;">
+                    <button class="btn btn-secondary" onclick="openPayoutModal('withholding')">+ Record Withholding</button>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><h2 class="card-title">Payout History</h2></div>
+                    <div class="list" id="payoutList"></div>
                 </div>
             </div>
         </main>
@@ -587,6 +664,51 @@
         </div>
     </div>
 
+    <!-- Payout Modal -->
+    <div class="modal-overlay" id="payoutModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="payoutModalTitle">Record Payout</h3>
+                <button class="modal-close" onclick="closePayoutModal()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <div class="modal-body">
+                <form id="payoutForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="payoutDate">Date</label>
+                            <input type="date" class="form-input" id="payoutDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="payoutAmount">Amount</label>
+                            <input type="number" class="form-input" id="payoutAmount" step="0.01" min="0" placeholder="0.00" required>
+                        </div>
+                    </div>
+                    <div class="form-group" id="payoutOwnerGroup">
+                        <label class="form-label" for="payoutOwner">Owner</label>
+                        <select class="form-select" id="payoutOwner" required>
+                            <option value="">-- Select Owner --</option>
+                            <option value="Alex">Alex</option>
+                            <option value="Tyna">Tyna</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="payoutDescription">Description</label>
+                        <input type="text" class="form-input" id="payoutDescription" placeholder="e.g., Monthly distribution">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="payoutNotes">Notes (optional)</label>
+                        <textarea class="form-textarea" id="payoutNotes" rows="2" placeholder="Any additional details..."></textarea>
+                    </div>
+                    <input type="hidden" id="payoutType" value="payout">
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closePayoutModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="savePayout()" id="savePayoutBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const SUPABASE_URL = 'https://bzihzomukmmqsijukdmn.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ6aWh6b211a21tcXNpanVrZG1uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwMzE5MjEsImV4cCI6MjA4NDYwNzkyMX0.y7k2kZyr1cuXOn8lJKWJwrOdR4fp-fWb1KDDpTT7BlY';
@@ -597,9 +719,9 @@
             expense: ['Business Fees', 'Client Purchases', 'Marketing', 'Houzz', 'GoDaddy', 'ATAP Taxes', 'Accountant', 'Other Expenses']
         };
 
-        let transactions = [], clients = [], timeEntries = [], mileageEntries = [];
+        let transactions = [], clients = [], timeEntries = [], mileageEntries = [], payouts = [];
         let currentType = 'income', currentFilter = 'all', currentUser = null;
-        let editingTxnId = null, editingClientId = null, editingTimeId = null, editingMileageId = null, viewingClientId = null;
+        let editingTxnId = null, editingClientId = null, editingTimeId = null, editingMileageId = null, viewingClientId = null, editingPayoutId = null;
         let profitChart = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
@@ -647,13 +769,20 @@
         function showAuthSuccess(msg) { const el = document.getElementById('authSuccess'); el.textContent = msg; el.classList.add('show'); }
         function hideAuthMessages() { document.getElementById('authError').classList.remove('show'); document.getElementById('authSuccess').classList.remove('show'); }
         function showApp() { document.getElementById('authContainer').style.display = 'none'; document.getElementById('appContainer').classList.add('show'); document.getElementById('userEmail').textContent = currentUser.email; updateBackupReminder(); }
-        async function signOut() { await supabase.auth.signOut(); currentUser = null; transactions = []; clients = []; timeEntries = []; mileageEntries = []; document.getElementById('authContainer').style.display = 'flex'; document.getElementById('appContainer').classList.remove('show'); }
+        async function signOut() { await supabase.auth.signOut(); currentUser = null; transactions = []; clients = []; timeEntries = []; mileageEntries = []; payouts = []; document.getElementById('authContainer').style.display = 'flex'; document.getElementById('appContainer').classList.remove('show'); }
 
         function setupEventListeners() {
             // Type toggle
             document.querySelectorAll('.type-btn').forEach(btn => btn.addEventListener('click', () => { document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); currentType = btn.dataset.type; updateCategoryOptions(); }));
-            // Date filter
-            document.querySelectorAll('.filter-btn').forEach(btn => btn.addEventListener('click', () => { document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); currentFilter = btn.dataset.filter; renderDashboard(); }));
+            // Date filter (both dashboard and payouts)
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                // Mark active in both date filter sections
+                document.querySelectorAll(`.filter-btn[data-filter="${btn.dataset.filter}"]`).forEach(b => b.classList.add('active'));
+                currentFilter = btn.dataset.filter;
+                renderDashboard();
+                renderPayouts();
+            }));
             // Tab navigation
             document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => { document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); tab.classList.add('active'); document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); document.getElementById(tab.dataset.tab + 'Tab').classList.add('active'); }));
             // Modal close on overlay click
@@ -662,16 +791,18 @@
         }
 
         async function loadAllData() {
-            const [txnRes, clientRes, timeRes, mileageRes] = await Promise.all([
+            const [txnRes, clientRes, timeRes, mileageRes, payoutRes] = await Promise.all([
                 supabase.from('as_transactions').select('*').order('date', { ascending: false }),
                 supabase.from('as_clients').select('*').order('name'),
                 supabase.from('as_time_entries').select('*').order('date', { ascending: false }),
-                supabase.from('as_mileage').select('*').order('date', { ascending: false })
+                supabase.from('as_mileage').select('*').order('date', { ascending: false }),
+                supabase.from('as_payouts').select('*').order('date', { ascending: false })
             ]);
             transactions = txnRes.data || [];
             clients = clientRes.data || [];
             timeEntries = timeRes.data || [];
             mileageEntries = mileageRes.data || [];
+            payouts = payoutRes.data || [];
             renderAll();
         }
 
@@ -680,6 +811,7 @@
             renderClients();
             renderTimeEntries();
             renderMileage();
+            renderPayouts();
             updateClientDropdowns();
         }
 
@@ -705,6 +837,48 @@
                 if (currentFilter === 'year') return d.getFullYear() === cy;
                 return true;
             });
+        }
+
+        function filterPayouts() {
+            const now = new Date(), cm = now.getMonth(), cy = now.getFullYear();
+            return payouts.filter(p => {
+                const d = new Date(p.date);
+                if (currentFilter === 'month') return d.getMonth() === cm && d.getFullYear() === cy;
+                if (currentFilter === 'lastMonth') { const lm = cm === 0 ? 11 : cm - 1, ly = cm === 0 ? cy - 1 : cy; return d.getMonth() === lm && d.getFullYear() === ly; }
+                if (currentFilter === 'quarter') return Math.floor(d.getMonth() / 3) === Math.floor(cm / 3) && d.getFullYear() === cy;
+                if (currentFilter === 'year') return d.getFullYear() === cy;
+                return true;
+            });
+        }
+
+        function calculateProfitSplit() {
+            const filteredTxns = filterTransactions();
+            const filteredPayouts = filterPayouts();
+
+            // Calculate net profit from transactions
+            const totalIncome = filteredTxns.filter(t => t.type === 'income').reduce((s, t) => s + parseFloat(t.amount), 0);
+            const totalExpenses = filteredTxns.filter(t => t.type === 'expense').reduce((s, t) => s + parseFloat(t.amount), 0);
+            const netProfit = totalIncome - totalExpenses;
+
+            // Calculate totals by type and owner
+            const alexPayouts = filteredPayouts.filter(p => p.type === 'payout' && p.owner === 'Alex').reduce((s, p) => s + parseFloat(p.amount), 0);
+            const tynaPayouts = filteredPayouts.filter(p => p.type === 'payout' && p.owner === 'Tyna').reduce((s, p) => s + parseFloat(p.amount), 0);
+            const totalWithheld = filteredPayouts.filter(p => p.type === 'withholding').reduce((s, p) => s + parseFloat(p.amount), 0);
+
+            const totalPaidOut = alexPayouts + tynaPayouts;
+            const availableToSplit = netProfit - totalPaidOut - totalWithheld;
+
+            // 50/50 split
+            const perOwnerShare = availableToSplit / 2;
+
+            return {
+                netProfit,
+                totalPaidOut,
+                totalWithheld,
+                availableToSplit,
+                alex: { paidOut: alexPayouts, available: perOwnerShare },
+                tyna: { paidOut: tynaPayouts, available: perOwnerShare }
+            };
         }
 
         function renderDashboard() {
@@ -1002,6 +1176,164 @@
             calculateDeduction();
         }
 
+        // Payouts Tab
+        function renderPayouts() {
+            const split = calculateProfitSplit();
+
+            // Update summary cards
+            document.getElementById('payoutNetProfit').textContent = formatCurrency(split.netProfit);
+            document.getElementById('payoutNetProfit').className = 'summary-value ' + (split.netProfit >= 0 ? 'positive' : 'negative');
+            document.getElementById('payoutAvailable').textContent = formatCurrency(split.availableToSplit);
+            document.getElementById('payoutTotalPaid').textContent = formatCurrency(split.totalPaidOut);
+            document.getElementById('payoutWithheld').textContent = formatCurrency(split.totalWithheld);
+
+            // Update owner cards
+            const alexAvail = document.getElementById('alexAvailable');
+            alexAvail.textContent = formatCurrency(split.alex.available);
+            alexAvail.className = 'owner-available' + (split.alex.available < 0 ? ' negative' : '');
+            document.getElementById('alexPaidOut').textContent = formatCurrency(split.alex.paidOut);
+
+            const tynaAvail = document.getElementById('tynaAvailable');
+            tynaAvail.textContent = formatCurrency(split.tyna.available);
+            tynaAvail.className = 'owner-available' + (split.tyna.available < 0 ? ' negative' : '');
+            document.getElementById('tynaPaidOut').textContent = formatCurrency(split.tyna.paidOut);
+
+            // Render payout history list
+            renderPayoutList();
+
+            // Sync date filter buttons
+            document.querySelectorAll('#payoutsDateFilter .filter-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.filter === currentFilter);
+            });
+        }
+
+        function renderPayoutList() {
+            const c = document.getElementById('payoutList');
+            const f = filterPayouts();
+            if (!f.length) {
+                c.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><p>No payouts recorded yet</p></div>';
+                return;
+            }
+            c.innerHTML = f.map(p => {
+                const isWithholding = p.type === 'withholding';
+                const ownerDisplay = isWithholding ? 'Business' : p.owner;
+                return `<div class="list-item" onclick="editPayout('${p.id}')">
+                    <div class="list-item-info">
+                        <div class="list-item-title">${escapeHtml(p.description || (isWithholding ? 'Withholding' : 'Payout'))}
+                            <span class="payout-type-badge ${p.type}">${isWithholding ? 'Withheld' : 'Payout'}</span>
+                        </div>
+                        <div class="list-item-meta">
+                            <span>${formatDate(p.date)}</span>
+                            <span>• ${ownerDisplay}</span>
+                        </div>
+                    </div>
+                    <div class="list-item-value ${isWithholding ? 'expense' : 'income'}">${isWithholding ? '' : '-'}${formatCurrency(parseFloat(p.amount))}</div>
+                    <div class="list-item-actions">
+                        <button class="action-btn delete" onclick="event.stopPropagation(); deletePayout('${p.id}')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // Payout Modal
+        function openPayoutModal(type = 'payout', owner = null, id = null) {
+            editingPayoutId = id;
+            const isWithholding = type === 'withholding';
+            document.getElementById('payoutModalTitle').textContent = id ? (isWithholding ? 'Edit Withholding' : 'Edit Payout') : (isWithholding ? 'Record Withholding' : 'Record Payout');
+            document.getElementById('payoutType').value = type;
+            document.getElementById('payoutOwnerGroup').style.display = isWithholding ? 'none' : 'block';
+            document.getElementById('payoutOwner').required = !isWithholding;
+
+            if (id) {
+                const p = payouts.find(x => x.id === id);
+                if (p) {
+                    document.getElementById('payoutDate').value = p.date;
+                    document.getElementById('payoutAmount').value = p.amount;
+                    document.getElementById('payoutOwner').value = p.owner || '';
+                    document.getElementById('payoutDescription').value = p.description || '';
+                    document.getElementById('payoutNotes').value = p.notes || '';
+                    document.getElementById('payoutType').value = p.type;
+                    document.getElementById('payoutOwnerGroup').style.display = p.type === 'withholding' ? 'none' : 'block';
+                    document.getElementById('payoutOwner').required = p.type !== 'withholding';
+                }
+            } else {
+                document.getElementById('payoutForm').reset();
+                document.getElementById('payoutDate').value = new Date().toISOString().split('T')[0];
+                document.getElementById('payoutType').value = type;
+                if (owner) document.getElementById('payoutOwner').value = owner;
+            }
+            document.getElementById('payoutModal').classList.add('active');
+        }
+
+        function closePayoutModal() {
+            document.getElementById('payoutModal').classList.remove('active');
+            editingPayoutId = null;
+        }
+
+        function editPayout(id) {
+            const p = payouts.find(x => x.id === id);
+            if (p) openPayoutModal(p.type, p.owner, id);
+        }
+
+        async function savePayout() {
+            const form = document.getElementById('payoutForm');
+            const type = document.getElementById('payoutType').value;
+            const isWithholding = type === 'withholding';
+
+            // Only validate owner for payouts, not withholdings
+            if (!isWithholding && !document.getElementById('payoutOwner').value) {
+                alert('Please select an owner for the payout.');
+                return;
+            }
+            if (!document.getElementById('payoutDate').value || !document.getElementById('payoutAmount').value) {
+                form.reportValidity();
+                return;
+            }
+
+            const btn = document.getElementById('savePayoutBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner"></span>';
+
+            const data = {
+                user_id: currentUser.id,
+                type: type,
+                date: document.getElementById('payoutDate').value,
+                amount: parseFloat(document.getElementById('payoutAmount').value),
+                owner: isWithholding ? null : document.getElementById('payoutOwner').value,
+                description: document.getElementById('payoutDescription').value || null,
+                notes: document.getElementById('payoutNotes').value || null
+            };
+
+            let error;
+            if (editingPayoutId) {
+                const r = await supabase.from('as_payouts').update(data).eq('id', editingPayoutId);
+                error = r.error;
+            } else {
+                const r = await supabase.from('as_payouts').insert([data]);
+                error = r.error;
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Save';
+
+            if (error) {
+                console.error('Payout save error:', error);
+                alert('Error saving: ' + (error.message || 'Unknown error'));
+                return;
+            }
+
+            await loadAllData();
+            closePayoutModal();
+        }
+
+        async function deletePayout(id) {
+            if (!confirm('Delete this record?')) return;
+            await supabase.from('as_payouts').delete().eq('id', id);
+            await loadAllData();
+        }
+
         // Export
         function exportCSV() {
             let csv = 'TRANSACTIONS\nDate,Type,Category,Client,Description,Amount,Notes\n';
@@ -1012,6 +1344,8 @@
             timeEntries.forEach(te => { const cl = clients.find(c => c.id === te.client_id); csv += `${te.date},"${cl ? cl.name : ''}",${te.hours},"${te.description.replace(/"/g, '""')}"\n`; });
             csv += '\nMILEAGE\nDate,Driver,Client,Miles,Description\n';
             mileageEntries.forEach(m => { const cl = clients.find(c => c.id === m.client_id); csv += `${m.date},"${m.driver || ''}","${cl ? cl.name : ''}",${m.miles},"${m.description.replace(/"/g, '""')}"\n`; });
+            csv += '\nPAYOUTS\nDate,Type,Owner,Amount,Description,Notes\n';
+            payouts.forEach(p => { csv += `${p.date},${p.type},"${p.owner || 'Business'}",${p.amount},"${(p.description || '').replace(/"/g, '""')}","${(p.notes || '').replace(/"/g, '""')}"\n`; });
             const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `aesthetic_state_${new Date().toISOString().split('T')[0]}.csv`; a.click();
             localStorage.setItem('lastExport', new Date().toISOString()); updateBackupReminder();
         }
