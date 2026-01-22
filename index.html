@@ -701,6 +701,13 @@
                             <option value="Tyna">Tyna</option>
                         </select>
                     </div>
+                    <div class="form-group" id="payoutMethodGroup">
+                        <label class="form-label" for="payoutMethod">Method</label>
+                        <select class="form-select" id="payoutMethod" required>
+                            <option value="cash">Cash Payout</option>
+                            <option value="card">Company Card (Personal Purchase)</option>
+                        </select>
+                    </div>
                     <div class="form-group">
                         <label class="form-label" for="payoutDescription">Description</label>
                         <input type="text" class="form-input" id="payoutDescription" placeholder="e.g., Monthly distribution">
@@ -1236,10 +1243,11 @@
             c.innerHTML = f.map(p => {
                 const isWithholding = p.type === 'withholding';
                 const ownerDisplay = isWithholding ? 'Business' : p.owner;
+                const methodDisplay = p.method === 'card' ? 'Card' : 'Cash';
                 return `<div class="list-item" onclick="editPayout('${p.id}')">
                     <div class="list-item-info">
                         <div class="list-item-title">${escapeHtml(p.description || (isWithholding ? 'Withholding' : 'Payout'))}
-                            <span class="payout-type-badge ${p.type}">${isWithholding ? 'Withheld' : 'Payout'}</span>
+                            <span class="payout-type-badge ${p.type}">${isWithholding ? 'Withheld' : methodDisplay}</span>
                         </div>
                         <div class="list-item-meta">
                             <span>${formatDate(p.date)}</span>
@@ -1263,6 +1271,7 @@
             document.getElementById('payoutModalTitle').textContent = id ? (isWithholding ? 'Edit Withholding' : 'Edit Payout') : (isWithholding ? 'Record Withholding' : 'Record Payout');
             document.getElementById('payoutType').value = type;
             document.getElementById('payoutOwnerGroup').style.display = isWithholding ? 'none' : 'block';
+            document.getElementById('payoutMethodGroup').style.display = isWithholding ? 'none' : 'block';
             document.getElementById('payoutOwner').required = !isWithholding;
 
             if (id) {
@@ -1271,16 +1280,19 @@
                     document.getElementById('payoutDate').value = p.date;
                     document.getElementById('payoutAmount').value = p.amount;
                     document.getElementById('payoutOwner').value = p.owner || '';
+                    document.getElementById('payoutMethod').value = p.method || 'cash';
                     document.getElementById('payoutDescription').value = p.description || '';
                     document.getElementById('payoutNotes').value = p.notes || '';
                     document.getElementById('payoutType').value = p.type;
                     document.getElementById('payoutOwnerGroup').style.display = p.type === 'withholding' ? 'none' : 'block';
+                    document.getElementById('payoutMethodGroup').style.display = p.type === 'withholding' ? 'none' : 'block';
                     document.getElementById('payoutOwner').required = p.type !== 'withholding';
                 }
             } else {
                 document.getElementById('payoutForm').reset();
                 document.getElementById('payoutDate').value = new Date().toISOString().split('T')[0];
                 document.getElementById('payoutType').value = type;
+                document.getElementById('payoutMethod').value = 'cash';
                 if (owner) document.getElementById('payoutOwner').value = owner;
             }
             document.getElementById('payoutModal').classList.add('active');
@@ -1321,6 +1333,7 @@
                 date: document.getElementById('payoutDate').value,
                 amount: parseFloat(document.getElementById('payoutAmount').value),
                 owner: isWithholding ? null : document.getElementById('payoutOwner').value,
+                method: isWithholding ? null : document.getElementById('payoutMethod').value,
                 description: document.getElementById('payoutDescription').value || null,
                 notes: document.getElementById('payoutNotes').value || null
             };
@@ -1363,8 +1376,8 @@
             timeEntries.forEach(te => { const cl = clients.find(c => c.id === te.client_id); csv += `${te.date},"${cl ? cl.name : ''}",${te.hours},"${te.description.replace(/"/g, '""')}"\n`; });
             csv += '\nMILEAGE\nDate,Driver,Client,Miles,Description\n';
             mileageEntries.forEach(m => { const cl = clients.find(c => c.id === m.client_id); csv += `${m.date},"${m.driver || ''}","${cl ? cl.name : ''}",${m.miles},"${m.description.replace(/"/g, '""')}"\n`; });
-            csv += '\nPAYOUTS\nDate,Type,Owner,Amount,Description,Notes\n';
-            payouts.forEach(p => { csv += `${p.date},${p.type},"${p.owner || 'Business'}",${p.amount},"${(p.description || '').replace(/"/g, '""')}","${(p.notes || '').replace(/"/g, '""')}"\n`; });
+            csv += '\nPAYOUTS\nDate,Type,Owner,Method,Amount,Description,Notes\n';
+            payouts.forEach(p => { csv += `${p.date},${p.type},"${p.owner || 'Business'}",${p.method || ''},${p.amount},"${(p.description || '').replace(/"/g, '""')}","${(p.notes || '').replace(/"/g, '""')}"\n`; });
             const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `aesthetic_state_${new Date().toISOString().split('T')[0]}.csv`; a.click();
             localStorage.setItem('lastExport', new Date().toISOString()); updateBackupReminder();
         }
