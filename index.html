@@ -997,7 +997,7 @@
                 const clientHours = timeEntries.filter(te => te.client_id === cl.id).reduce((s, te) => s + parseFloat(te.hours), 0);
                 const effectiveHourly = clientHours > 0 ? clientRevenue / clientHours : 0;
                 const clientRate = cl.hourly_rate ? formatCurrency(cl.hourly_rate) : 'Not set';
-                return `<div class="client-card" onclick="viewClient('${cl.id}')"><div class="client-name">${escapeHtml(cl.name)}</div>${cl.hourly_rate ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Rate: ${clientRate}/hr</div>` : ''}<div class="client-stats"><div><div class="client-stat-label">Revenue</div><div class="client-stat-value">${formatCurrency(clientRevenue)}</div></div><div><div class="client-stat-label">Eff. Hourly</div><div class="client-stat-value">${formatCurrency(effectiveHourly)}</div></div></div></div>`;
+                return `<div class="client-card" onclick="viewClient('${cl.id}')"><div class="client-name">${escapeHtml(cl.name)}</div>${cl.address ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">${escapeHtml(cl.address)}</div>` : ''}${cl.hourly_rate ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Rate: ${clientRate}/hr</div>` : ''}<div class="client-stats"><div><div class="client-stat-label">Revenue</div><div class="client-stat-value">${formatCurrency(clientRevenue)}</div></div><div><div class="client-stat-label">Eff. Hourly</div><div class="client-stat-value">${formatCurrency(effectiveHourly)}</div></div></div></div>`;
             }).join('');
         }
 
