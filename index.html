@@ -207,8 +207,10 @@
         .paid-badge { font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; padding: 0.3rem 0.7rem; border-radius: var(--radius-sm); cursor: pointer; transition: all 0.15s ease; }
         .paid-badge.paid { background: #D4EDDA; color: #28A745; }
         .paid-badge.unpaid { background: #FFF3CD; color: #D68910; }
+        .paid-badge.pending { background: #DBEAFE; color: #2563EB; }
         .paid-badge:hover { transform: scale(1.05); }
         .list-item.unpaid { border-left: 3px solid #F5B041; }
+        .list-item.pending { border-left: 3px solid #3B82F6; }
     </style>
 </head>
 <body>
@@ -309,6 +311,11 @@
                         <div class="summary-label">Outstanding</div>
                         <div class="summary-value" id="totalOutstanding" style="color: #B45309;">$0</div>
                         <div class="summary-sub">Unpaid income</div>
+                    </div>
+                    <div class="summary-card" style="border-top: 3px solid #3B82F6;">
+                        <div class="summary-label">Pending</div>
+                        <div class="summary-value" id="totalPending" style="color: #2563EB;">$0</div>
+                        <div class="summary-sub">Expected expenses</div>
                     </div>
                 </div>
                 <div style="margin-bottom: 1rem;">
@@ -539,7 +546,7 @@
                     <div class="form-group" id="txnPaidGroup" style="display: none;">
                         <label class="form-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                             <input type="checkbox" id="txnPaid" style="width: 16px; height: 16px; cursor: pointer;">
-                            Payment Received
+                            <span id="txnPaidLabel">Payment Received</span>
                         </label>
                         <input type="date" class="form-input" id="txnPaidDate" style="margin-top: 0.5rem; display: none;" placeholder="Payment date">
                     </div>
@@ -811,8 +818,9 @@
                 btn.classList.add('active');
                 currentType = btn.dataset.type;
                 updateCategoryOptions();
-                // Show paid option only for income
-                document.getElementById('txnPaidGroup').style.display = currentType === 'income' ? 'block' : 'none';
+                // Show paid option for both income and expenses with appropriate label
+                document.getElementById('txnPaidGroup').style.display = 'block';
+                document.getElementById('txnPaidLabel').textContent = currentType === 'income' ? 'Payment Received' : 'Expense Paid';
             }));
             // Paid checkbox toggle - show/hide date field
             document.getElementById('txnPaid').addEventListener('change', (e) => {
@@ -940,10 +948,11 @@
             const inc = f.filter(t => t.type === 'income').reduce((s, t) => s + parseFloat(t.amount), 0);
             const exp = f.filter(t => t.type === 'expense').reduce((s, t) => s + parseFloat(t.amount), 0);
             const outstanding = f.filter(t => t.type === 'income' && !t.paid).reduce((s, t) => s + parseFloat(t.amount), 0);
-            const expenseRatio = inc > 0 ? Math.round((exp / inc) * 100) : 0;
+            const pending = f.filter(t => t.type === 'expense' && !t.paid).reduce((s, t) => s + parseFloat(t.amount), 0);
             document.getElementById('totalIncome').textContent = formatCurrency(inc);
             document.getElementById('totalExpenses').textContent = formatCurrency(exp);
             document.getElementById('totalOutstanding').textContent = formatCurrency(outstanding);
+            document.getElementById('totalPending').textContent = formatCurrency(pending);
             const pe = document.getElementById('netProfit'); pe.textContent = formatCurrency(inc - exp); pe.className = 'summary-value ' + (inc - exp >= 0 ? 'positive' : 'negative');
             renderTransactionList();
             renderPnL();
@@ -967,9 +976,14 @@
                     titleText = client ? escapeHtml(client.name) : escapeHtml(t.description);
                     metaDesc = client ? t.description : null;
                 }
-                const isUnpaid = t.type === 'income' && !t.paid;
-                const paidBadge = t.type === 'income' ? `<span class="paid-badge ${t.paid ? 'paid' : 'unpaid'}" onclick="event.stopPropagation(); togglePaid('${t.id}')">${t.paid ? 'Paid' : 'Unpaid'}</span>` : '';
-                return `<div class="list-item${isUnpaid ? ' unpaid' : ''}" onclick="editTransaction('${t.id}')"><div class="list-item-info"><div class="list-item-title">${titleText} ${paidBadge}</div><div class="list-item-meta"><span>${formatDate(t.date)}</span><span>${escapeHtml(t.category)}</span>${metaDesc ? `<span>• ${escapeHtml(metaDesc)}</span>` : ''}</div></div><div class="list-item-value ${t.type}">${t.type === 'expense' ? '-' : '+'}${formatCurrency(parseFloat(t.amount))}</div><div class="list-item-actions"><button class="action-btn delete" onclick="event.stopPropagation(); deleteTransaction('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div></div>`;
+                const isPending = !t.paid;
+                let statusBadge = '';
+                if (t.type === 'income') {
+                    statusBadge = `<span class="paid-badge ${t.paid ? 'paid' : 'unpaid'}" onclick="event.stopPropagation(); togglePaid('${t.id}')">${t.paid ? 'Paid' : 'Unpaid'}</span>`;
+                } else {
+                    statusBadge = `<span class="paid-badge ${t.paid ? 'paid' : 'pending'}" onclick="event.stopPropagation(); togglePaid('${t.id}')">${t.paid ? 'Paid' : 'Pending'}</span>`;
+                }
+                return `<div class="list-item${isPending ? (t.type === 'income' ? ' unpaid' : ' pending') : ''}" onclick="editTransaction('${t.id}')"><div class="list-item-info"><div class="list-item-title">${titleText} ${statusBadge}</div><div class="list-item-meta"><span>${formatDate(t.date)}</span><span>${escapeHtml(t.category)}</span>${metaDesc ? `<span>• ${escapeHtml(metaDesc)}</span>` : ''}</div></div><div class="list-item-value ${t.type}">${t.type === 'expense' ? '-' : '+'}${formatCurrency(parseFloat(t.amount))}</div><div class="list-item-actions"><button class="action-btn delete" onclick="event.stopPropagation(); deleteTransaction('${t.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div></div>`;
             }).join('');
         }
 
@@ -1050,8 +1064,9 @@
                     document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === t.type));
                     updateCategoryOptions();
                     document.getElementById('txnCategory').value = t.category;
-                    // Handle paid status
-                    document.getElementById('txnPaidGroup').style.display = t.type === 'income' ? 'block' : 'none';
+                    // Handle paid status for both income and expenses
+                    document.getElementById('txnPaidGroup').style.display = 'block';
+                    document.getElementById('txnPaidLabel').textContent = t.type === 'income' ? 'Payment Received' : 'Expense Paid';
                     document.getElementById('txnPaid').checked = t.paid || false;
                     document.getElementById('txnPaidDate').style.display = t.paid ? 'block' : 'none';
                     document.getElementById('txnPaidDate').value = t.paid_date || '';
@@ -1062,8 +1077,9 @@
                 currentType = 'income';
                 document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'income'));
                 updateCategoryOptions();
-                // Default for new income: unpaid
+                // Default for new transaction: unpaid/pending
                 document.getElementById('txnPaidGroup').style.display = 'block';
+                document.getElementById('txnPaidLabel').textContent = 'Payment Received';
                 document.getElementById('txnPaid').checked = false;
                 document.getElementById('txnPaidDate').style.display = 'none';
                 document.getElementById('txnPaidDate').value = '';
@@ -1075,7 +1091,7 @@
         async function saveTransaction() {
             const form = document.getElementById('transactionForm'); if (!form.checkValidity()) { form.reportValidity(); return; }
             const btn = document.getElementById('saveTxnBtn'); btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>';
-            const isPaid = currentType === 'income' ? document.getElementById('txnPaid').checked : true;
+            const isPaid = document.getElementById('txnPaid').checked;
             const paidDate = isPaid && document.getElementById('txnPaidDate').value ? document.getElementById('txnPaidDate').value : null;
             const data = {
                 user_id: currentUser.id,
@@ -1098,7 +1114,7 @@
 
         async function togglePaid(id) {
             const t = transactions.find(x => x.id === id);
-            if (!t || t.type !== 'income') return;
+            if (!t) return;
             const newPaid = !t.paid;
             const paidDate = newPaid ? new Date().toISOString().split('T')[0] : null;
             const { error } = await supabase.from('as_transactions').update({ paid: newPaid, paid_date: paidDate }).eq('id', id);
