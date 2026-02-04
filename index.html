@@ -265,6 +265,10 @@
                 <div class="header-actions">
                     <span class="user-email" id="userEmail"></span>
                     <span class="backup-reminder" id="backupReminder" onclick="exportCSV()">⚠️ Backup needed</span>
+                    <button class="btn btn-ghost" onclick="openImportModal()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        Import
+                    </button>
                     <button class="btn btn-ghost" onclick="exportCSV()">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         Export
@@ -745,6 +749,63 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closePayoutModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="savePayout()" id="savePayoutBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div class="modal-overlay" id="importModal">
+        <div class="modal" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Import Transactions</h3>
+                <button class="modal-close" onclick="closeImportModal()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <div class="modal-body">
+                <div id="importStep1">
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                        Upload a CSV file with the following columns:<br>
+                        <strong>Item, Client, DATE, REVENUE, EXPENSE, Write off</strong>
+                    </p>
+                    <div style="border: 2px dashed var(--border); border-radius: var(--radius-md); padding: 2rem; text-align: center; background: var(--bg-accent); cursor: pointer;" onclick="document.getElementById('importFile').click()" id="importDropZone">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" style="margin-bottom: 1rem;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary);">Click to select or drag & drop a CSV file</p>
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">Supports .csv files</p>
+                    </div>
+                    <input type="file" id="importFile" accept=".csv" style="display: none;" onchange="handleImportFile(event)">
+                </div>
+                <div id="importStep2" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h4 style="font-size: 0.9rem; font-weight: 500;">Preview Import (<span id="importRowCount">0</span> rows)</h4>
+                        <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.5rem 1rem;" onclick="resetImport()">Choose Different File</button>
+                    </div>
+                    <div style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm);">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+                            <thead style="position: sticky; top: 0; background: var(--bg-accent);">
+                                <tr id="importPreviewHeader"></tr>
+                            </thead>
+                            <tbody id="importPreviewBody"></tbody>
+                        </table>
+                    </div>
+                    <div style="margin-top: 1rem; padding: 1rem; background: var(--bg-accent); border-radius: var(--radius-sm);">
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">Import Summary:</div>
+                        <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+                            <div><span style="color: var(--income-sage); font-weight: 600;" id="importIncomeCount">0</span> income transactions</div>
+                            <div><span style="color: var(--expense-clay); font-weight: 600;" id="importExpenseCount">0</span> expense transactions</div>
+                            <div><span style="color: var(--text-primary); font-weight: 600;" id="importNewClientCount">0</span> new clients</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="importProgress" style="display: none;">
+                    <div style="text-align: center; padding: 2rem;">
+                        <span class="loading-spinner" style="width: 32px; height: 32px;"></span>
+                        <p style="margin-top: 1rem; color: var(--text-secondary);">Importing transactions...</p>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;" id="importProgressText">0 of 0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" id="importFooter">
+                <button class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="executeImport()" id="importBtn" disabled>Import</button>
             </div>
         </div>
     </div>
@@ -1481,6 +1542,328 @@
         }
 
         // Export
+        // Import functionality
+        let importData = [];
+        let importNewClients = [];
+
+        function openImportModal() {
+            document.getElementById('importModal').classList.add('active');
+            resetImport();
+        }
+
+        function closeImportModal() {
+            document.getElementById('importModal').classList.remove('active');
+            resetImport();
+        }
+
+        function resetImport() {
+            importData = [];
+            importNewClients = [];
+            document.getElementById('importFile').value = '';
+            document.getElementById('importStep1').style.display = 'block';
+            document.getElementById('importStep2').style.display = 'none';
+            document.getElementById('importProgress').style.display = 'none';
+            document.getElementById('importFooter').style.display = 'flex';
+            document.getElementById('importBtn').disabled = true;
+        }
+
+        function handleImportFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                parseImportCSV(e.target.result);
+            };
+            reader.readAsText(file);
+        }
+
+        function parseImportCSV(csvText) {
+            const lines = csvText.split(/\r?\n/).filter(line => line.trim());
+            if (lines.length < 2) {
+                alert('CSV file appears to be empty or has no data rows');
+                return;
+            }
+
+            // Parse header - handle various formats
+            const headerLine = lines[0];
+            const headers = parseCSVLine(headerLine).map(h => h.toLowerCase().trim());
+
+            // Map column indices
+            const colMap = {
+                item: headers.findIndex(h => h === 'item' || h === 'description'),
+                client: headers.findIndex(h => h === 'client'),
+                date: headers.findIndex(h => h === 'date'),
+                revenue: headers.findIndex(h => h === 'revenue' || h === 'income'),
+                expense: headers.findIndex(h => h === 'expense'),
+                writeoff: headers.findIndex(h => h === 'write off' || h === 'writeoff' || h === 'write_off' || h === 'write off (yes)')
+            };
+
+            // Validate required columns
+            if (colMap.date === -1) {
+                alert('CSV must have a DATE column');
+                return;
+            }
+            if (colMap.revenue === -1 && colMap.expense === -1) {
+                alert('CSV must have at least REVENUE or EXPENSE column');
+                return;
+            }
+
+            // Parse data rows
+            importData = [];
+            const existingClientNames = clients.map(c => c.name.toLowerCase());
+            const newClientNames = new Set();
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = parseCSVLine(lines[i]);
+                if (values.every(v => !v.trim())) continue; // Skip empty rows
+
+                const item = colMap.item >= 0 ? values[colMap.item]?.trim() || '' : '';
+                const clientName = colMap.client >= 0 ? values[colMap.client]?.trim() || '' : '';
+                const dateStr = colMap.date >= 0 ? values[colMap.date]?.trim() || '' : '';
+                const revenue = colMap.revenue >= 0 ? parseAmount(values[colMap.revenue]) : 0;
+                const expense = colMap.expense >= 0 ? parseAmount(values[colMap.expense]) : 0;
+                const writeoff = colMap.writeoff >= 0 ? values[colMap.writeoff]?.trim().toLowerCase() === 'yes' : false;
+
+                // Parse date - support multiple formats
+                const parsedDate = parseImportDate(dateStr);
+                if (!parsedDate && (revenue > 0 || expense > 0)) {
+                    console.warn(`Skipping row ${i + 1}: invalid date "${dateStr}"`);
+                    continue;
+                }
+
+                // Track new clients
+                if (clientName && !existingClientNames.includes(clientName.toLowerCase()) && !newClientNames.has(clientName.toLowerCase())) {
+                    newClientNames.add(clientName.toLowerCase());
+                    importNewClients.push(clientName);
+                }
+
+                // Create transaction entry if there's an amount
+                if (revenue > 0) {
+                    importData.push({
+                        type: 'income',
+                        description: item || 'Imported income',
+                        client: clientName,
+                        date: parsedDate,
+                        amount: revenue,
+                        category: 'Invoice',
+                        writeoff: writeoff,
+                        paid: true, // Assume imported historical data is paid
+                        originalRow: i + 1
+                    });
+                }
+                if (expense > 0) {
+                    importData.push({
+                        type: 'expense',
+                        description: item || 'Imported expense',
+                        client: clientName,
+                        date: parsedDate,
+                        amount: expense,
+                        category: writeoff ? 'Business Fees' : 'Other Expenses',
+                        writeoff: writeoff,
+                        paid: true, // Assume imported historical data is paid
+                        originalRow: i + 1
+                    });
+                }
+            }
+
+            if (importData.length === 0) {
+                alert('No valid transactions found in the CSV file');
+                return;
+            }
+
+            // Show preview
+            showImportPreview(headers, lines);
+        }
+
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"') {
+                    if (inQuotes && line[i + 1] === '"') {
+                        current += '"';
+                        i++;
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current);
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current);
+            return result;
+        }
+
+        function parseAmount(str) {
+            if (!str) return 0;
+            // Remove currency symbols, commas, and whitespace
+            const cleaned = str.toString().replace(/[$,\s]/g, '').trim();
+            // Handle parentheses for negative numbers
+            if (cleaned.startsWith('(') && cleaned.endsWith(')')) {
+                return Math.abs(parseFloat(cleaned.slice(1, -1)) || 0);
+            }
+            return Math.abs(parseFloat(cleaned) || 0);
+        }
+
+        function parseImportDate(dateStr) {
+            if (!dateStr) return null;
+
+            // Try various date formats
+            // MM/DD/YY or MM/DD/YYYY
+            let match = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+            if (match) {
+                let year = parseInt(match[3]);
+                if (year < 100) year += 2000;
+                const month = match[1].padStart(2, '0');
+                const day = match[2].padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            }
+
+            // YYYY-MM-DD (ISO format)
+            match = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+            if (match) {
+                return `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+            }
+
+            // Try native Date parsing as fallback
+            const d = new Date(dateStr);
+            if (!isNaN(d.getTime())) {
+                return d.toISOString().split('T')[0];
+            }
+
+            return null;
+        }
+
+        function showImportPreview(headers, lines) {
+            document.getElementById('importStep1').style.display = 'none';
+            document.getElementById('importStep2').style.display = 'block';
+
+            // Show header
+            const headerRow = document.getElementById('importPreviewHeader');
+            headerRow.innerHTML = headers.map(h => `<th style="padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.1em;">${escapeHtml(h)}</th>`).join('');
+
+            // Show first 10 data rows
+            const tbody = document.getElementById('importPreviewBody');
+            const previewRows = lines.slice(1, 11);
+            tbody.innerHTML = previewRows.map(line => {
+                const values = parseCSVLine(line);
+                return `<tr>${values.map(v => `<td style="padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border);">${escapeHtml(v || '')}</td>`).join('')}</tr>`;
+            }).join('');
+
+            if (lines.length > 11) {
+                tbody.innerHTML += `<tr><td colspan="${headers.length}" style="padding: 0.75rem; text-align: center; color: var(--text-muted); font-style: italic;">... and ${lines.length - 11} more rows</td></tr>`;
+            }
+
+            // Update counts
+            document.getElementById('importRowCount').textContent = importData.length;
+            document.getElementById('importIncomeCount').textContent = importData.filter(d => d.type === 'income').length;
+            document.getElementById('importExpenseCount').textContent = importData.filter(d => d.type === 'expense').length;
+            document.getElementById('importNewClientCount').textContent = importNewClients.length;
+
+            document.getElementById('importBtn').disabled = false;
+        }
+
+        async function executeImport() {
+            document.getElementById('importStep2').style.display = 'none';
+            document.getElementById('importProgress').style.display = 'block';
+            document.getElementById('importFooter').style.display = 'none';
+
+            try {
+                // First, create any new clients
+                const clientNameToId = {};
+                clients.forEach(c => { clientNameToId[c.name.toLowerCase()] = c.id; });
+
+                for (let i = 0; i < importNewClients.length; i++) {
+                    const clientName = importNewClients[i];
+                    document.getElementById('importProgressText').textContent = `Creating client: ${clientName}`;
+
+                    const { data, error } = await supabase.from('as_clients').insert({
+                        user_id: currentUser.id,
+                        name: clientName
+                    }).select();
+
+                    if (error) throw error;
+                    if (data && data[0]) {
+                        clientNameToId[clientName.toLowerCase()] = data[0].id;
+                        clients.push(data[0]);
+                    }
+                }
+
+                // Now import transactions
+                let successCount = 0;
+                for (let i = 0; i < importData.length; i++) {
+                    const row = importData[i];
+                    document.getElementById('importProgressText').textContent = `Importing ${i + 1} of ${importData.length}`;
+
+                    const clientId = row.client ? clientNameToId[row.client.toLowerCase()] || null : null;
+
+                    const txnData = {
+                        user_id: currentUser.id,
+                        type: row.type,
+                        date: row.date,
+                        amount: row.amount,
+                        category: row.category,
+                        description: row.description,
+                        client_id: clientId,
+                        paid: row.paid,
+                        notes: row.writeoff ? 'Write-off' : null
+                    };
+
+                    const { data, error } = await supabase.from('as_transactions').insert(txnData).select();
+                    if (error) {
+                        console.error(`Error importing row ${row.originalRow}:`, error);
+                    } else {
+                        successCount++;
+                        if (data && data[0]) transactions.unshift(data[0]);
+                    }
+                }
+
+                // Refresh UI
+                renderAll();
+                closeImportModal();
+                alert(`Successfully imported ${successCount} transactions!`);
+            } catch (error) {
+                console.error('Import error:', error);
+                alert('Error during import: ' + error.message);
+                document.getElementById('importProgress').style.display = 'none';
+                document.getElementById('importStep2').style.display = 'block';
+                document.getElementById('importFooter').style.display = 'flex';
+            }
+        }
+
+        // Drag and drop support for import
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropZone = document.getElementById('importDropZone');
+            if (dropZone) {
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, preventDefaults, false);
+                });
+                function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, () => dropZone.style.borderColor = 'var(--accent-taupe)', false);
+                });
+                ['dragleave', 'drop'].forEach(eventName => {
+                    dropZone.addEventListener(eventName, () => dropZone.style.borderColor = 'var(--border)', false);
+                });
+
+                dropZone.addEventListener('drop', (e) => {
+                    const file = e.dataTransfer.files[0];
+                    if (file && file.name.endsWith('.csv')) {
+                        document.getElementById('importFile').files = e.dataTransfer.files;
+                        handleImportFile({ target: { files: [file] } });
+                    }
+                }, false);
+            }
+        });
+
         function exportCSV() {
             let csv = 'TRANSACTIONS\nDate,Type,Category,Client,Description,Amount,Paid,Paid Date,Notes\n';
             transactions.forEach(t => { const cl = clients.find(c => c.id === t.client_id); csv += `${t.date},${t.type},${t.category},"${cl ? cl.name : ''}","${t.description.replace(/"/g, '""')}",${t.amount},${t.paid ? 'Yes' : 'No'},${t.paid_date || ''},"${(t.notes || '').replace(/"/g, '""')}"\n`; });
